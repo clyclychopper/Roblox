@@ -1,7 +1,6 @@
 --// SETTINGS
 local plotsFolder = workspace:WaitForChild("Plots")
 
-local Avatar  = "https://cdn.discordapp.com/embed/avatars/4.png"
 local Content = "@everyone"
 
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1475066199342583848/tSwVV5wvoobDvA2cd0ZBJH3bELIEIxvFYswZ_mmVNLwzLgt9xo_k0fF-JT_P9dfw4GXz" -- <<<< change this
@@ -1221,6 +1220,28 @@ local traitAliases = {
 }
 
 --// HELPERS
+
+local function normalizeMutation(m)
+    m = tostring(m or "Default")
+    m = m:gsub("%s+", "") -- optional: remove spaces
+    -- Force consistent casing for common ones
+    local map = {
+        default = "Default",
+        gold = "Gold",
+        diamond = "Diamond",
+        bloodrot = "Bloodrot",
+        candy = "Candy",
+        lava = "Lava",
+        galaxy = "Galaxy",
+        yinyang = "YinYang",
+        radioactive = "Radioactive",
+        cursed = "Cursed",
+        divine = "Divine",
+        rainbow = "Rainbow",
+    }
+    return map[m:lower()] or m
+end
+
 local function normalizeBrainrotName(raw)
     raw = tostring(raw or "")
     raw = raw:gsub("%b[]", "") -- remove [..]
@@ -1310,7 +1331,9 @@ end
 
 local function computeIncome(baseIncome, mutation, traitString)
     local base = tonumber(baseIncome) or 0
-    local mMult = mutationMultipliers[mutation or "Default"] or 1
+
+    mutation = normalizeMutation(mutation)
+    local mMult = mutationMultipliers[mutation] or 1
 
     local traitList = parseTraits(traitString)
 
@@ -1332,6 +1355,10 @@ local function computeIncome(baseIncome, mutation, traitString)
             -- optional debug (helps fix "Claws" naming etc.)
              warn("Unknown trait:", rawTrait, "mapped:", tName)
         end
+    end
+
+    if sumTraitMult <= 0 then 
+        sumTraitMult = 1         
     end
 
     local total = base * sumTraitMult * mMult
@@ -1374,8 +1401,8 @@ local function sendWebhookOnce(lines)
     local timestamp = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.min, t.sec)
 
     local embed = {
-        title = "Steal A Brainrot Scanner",
-        description = Content .. "\n\n" .. list,
+        title = "Brainrot Here My Nigga",
+        description = list,
         color = 99999,
         footer = { text = game.JobId },
         fields = {
