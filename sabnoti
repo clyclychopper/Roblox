@@ -1402,6 +1402,7 @@ local function sendWebhookOnce(lines)
 
     local embed = {
         title = "Brainrot Here My Nigga",
+        url = "https://www.roblox.com/games/start?placeId=109983668079237&gameInstanceId="..game.JobId,
         description = list,
         color = 99999,
         footer = { text = game.JobId },
