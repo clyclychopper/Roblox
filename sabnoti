@@ -6,7 +6,7 @@ local Content = "@everyone"
 
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1475066199342583848/tSwVV5wvoobDvA2cd0ZBJH3bELIEIxvFYswZ_mmVNLwzLgt9xo_k0fF-JT_P9dfw4GXz" -- <<<< change this
 
-local MIN_INCOME = 100
+local MIN_INCOME = 10000000
 local SEND_DELAY = 2       -- seconds to batch into 1 webhook
 local SCAN_DELAY = 1.0     -- seconds to wait after DescendantAdded (lets attributes/valueobjects load)
 
