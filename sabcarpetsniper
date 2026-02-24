@@ -1,1 +1,172 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
 
+--// SETTINGS
+local targetNames = {
+    "Noobini Pizzanini",
+    "Trippi Troppi",
+    "Tim Cheese",
+}
+
+local FIRE_DISTANCE = 5
+local DEBOUNCE = 3
+local REFIRE_COOLDOWN = 8 -- seconds before same target can be fired again
+local lastFired = 0
+local isBusy = false
+
+local renderedFolder = workspace:WaitForChild("RenderedMovingAnimals")
+
+-- tracks recently fired prompts so we dont follow them again
+local recentlyFired = {} -- [prompt] = tick() when fired
+
+local function cleanRecentlyFired()
+    local now = tick()
+    for prompt, firedAt in pairs(recentlyFired) do
+        if now - firedAt > REFIRE_COOLDOWN then
+            recentlyFired[prompt] = nil
+        end
+    end
+end
+
+--// HELPERS
+local function matchesTarget(objectText)
+    for _, name in ipairs(targetNames) do
+        if objectText:lower():find(name:lower(), 1, true) then
+            return true, name
+        end
+    end
+    return false, nil
+end
+
+local function getPromptPart(prompt)
+    local p = prompt.Parent
+    if p:IsA("Attachment") then p = p.Parent end
+    if p:IsA("BasePart") then return p end
+    return nil
+end
+
+local function isAnimalRendered(targetName)
+    for _, child in ipairs(renderedFolder:GetChildren()) do
+        if child.Name:lower():find(targetName:lower(), 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+local function findClosestPrompt()
+    cleanRecentlyFired()
+
+    local closestPrompt = nil
+    local closestPart = nil
+    local closestDist = math.huge
+    local closestMatchedName = nil
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.ActionText == "Purchase" then
+            local matches, matchedName = matchesTarget(obj.ObjectText)
+            if matches and isAnimalRendered(matchedName) then
+                -- skip if recently fired
+                if not recentlyFired[obj] then
+                    local part = getPromptPart(obj)
+                    if part then
+                        local dist = (rootPart.Position - part.Position).Magnitude
+                        if dist < closestDist then
+                            closestDist = dist
+                            closestPrompt = obj
+                            closestPart = part
+                            closestMatchedName = matchedName
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return closestPrompt, closestPart, closestDist, closestMatchedName
+end
+
+local function findAndFire()
+    if isBusy then return end
+    local now = tick()
+    if now - lastFired < DEBOUNCE then return end
+
+    local prompt, part, dist, matchedName = findClosestPrompt()
+    if not prompt or not part then return end
+
+    print("Locking onto:", prompt.ObjectText, "| Dist:", math.floor(dist))
+    isBusy = true
+
+    local lockedPrompt = prompt
+    local lockedPart = part
+    local lockedName = matchedName
+    local fired = false
+    local timeout = tick() + 15
+
+    while tick() < timeout do
+        if not lockedPrompt or not lockedPrompt.Parent or not lockedPart or not lockedPart.Parent then
+            warn("Prompt disappeared")
+            break
+        end
+
+        if not isAnimalRendered(lockedName) then
+            warn("Animal despawned mid-walk")
+            break
+        end
+
+        local currentDist = (rootPart.Position - lockedPart.Position).Magnitude
+        humanoid:MoveTo(lockedPart.Position)
+
+        if currentDist <= FIRE_DISTANCE then
+            task.wait(0.15)
+            if lockedPrompt and lockedPrompt.Parent then
+                local finalDist = (rootPart.Position - lockedPart.Position).Magnitude
+                if finalDist <= FIRE_DISTANCE then
+                    fireproximityprompt(lockedPrompt)
+                    print("Fired:", lockedPrompt.ObjectText, "| Dist:", math.floor(finalDist))
+                    lastFired = tick()
+                    recentlyFired[lockedPrompt] = tick() -- mark as fired
+                    fired = true
+                end
+            end
+            break
+        end
+
+        task.wait(0.1)
+    end
+
+    if not fired then
+        warn("Did not fire, retrying")
+    end
+
+    isBusy = false
+end
+
+--// RESPAWN HANDLER
+player.CharacterAdded:Connect(function(char)
+    character = char
+    rootPart = char:WaitForChild("HumanoidRootPart")
+    humanoid = char:WaitForChild("Humanoid")
+    isBusy = false
+    lastFired = 0
+    recentlyFired = {}
+end)
+
+--// BACKGROUND LOOP
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+
+        if getgenv().AutoBuyerEnabled then
+            findAndFire()
+        end
+    end
+end)
+
+print("Watching for", #targetNames, "targets:")
+for _, name in ipairs(targetNames) do
+    print(" -", name)
+end
