@@ -5,19 +5,16 @@ local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local Content = ""
 
 local WEBHOOK_URL = getgenv().Webhook or error("❌ Webhook not set! Set getgenv().Webhook first")
--- 🔹 GitHub Gist Settings
 local GITHUB_TOKEN = getgenv().GithubToken or error("❌ GitHub token not set! Set getgenv().GithubToken first")
 local GIST_ID = getgenv().GistID or ""
 local GIST_FILENAME = "brainrot_server.json"
-local UPDATE_GIST = true -- Set to false to disable Gist updates
+local UPDATE_GIST = true
 
 local MIN_INCOME = 10000000
 local SEND_DELAY = 3
 local SCAN_DELAY = 1.5
 local PING_MIN = 300000000
 
--- PING
-local PING_MIN = 300000000 -- 300m threshold for ping (change if you want)
 local PING_NAMES = {
     ["Rosetti Tualetti"] = true,
     ["Rosey and Teddy"] = true,
@@ -66,8 +63,6 @@ local PING_NAMES = {
 
 local globalShouldPing = false
 
---// YOUR DATA (KEEP YOUR BIG TABLES HERE)
--- Paste your big brainrots list here
 local brainrots = {
 -- God
 "Swaggy Bros",
@@ -606,7 +601,6 @@ local rarityByName = {
     ["Strawberry Elephant"] = "OG"
 
 }
-
 local costByName = {
 
     ["Swaggy Bros"] = 7000000000,
@@ -947,7 +941,6 @@ local costByName = {
     ["Meowl"] = 500000000000,
     ["Strawberry Elephant"] = 750000000000
 }
-
 local incomeByName = {
     ["Swaggy Bros"] = 40000000,
     ["Los Amigos"] = 130000000,
@@ -1207,8 +1200,6 @@ local incomeByName = {
     ["Strawberry Elephant"] = 750000000
 
 }
-
--- Your multipliers/tables
 local mutationMultipliers = {
     ["None"] = 1,
     ["Gold"] = 1.25,
@@ -1223,7 +1214,6 @@ local mutationMultipliers = {
     ["Divine"] = 10,
     ["Rainbow"] = 10
 }
-
 
 local traits = {
     -- OG Event Traits
@@ -1278,9 +1268,6 @@ local traits = {
     -- Worst Trait
     ["Sleepy"] = 0.5, -- ÷2
 }
-
---// TRAIT ALIASES (game/internal names -> canonical keys above)
--- Add to this whenever you see "Unknown trait detected: X"
 local traitAliases = {
     -- Strawberry / Meowl / Skibidi
     ["ICON Meowl"] = "Meowl",
@@ -1331,7 +1318,6 @@ local traitAliases = {
     ["SleepySleepy"] = "Sleepy",
 }
 
-
 --// GIST UPLOADER
 local HttpService = game:GetService("HttpService")
 
@@ -1350,9 +1336,11 @@ local currentGistData = {
     brainrots = {}
 }
 
--- 🔹 Load existing Gist data on startup
+-- ✅ FIX: Track what we've added to Gist to prevent duplicates
+local gistEntryKeys = {}
+
 local function loadExistingGist()
-    if GIST_ID == "" then return end -- No existing Gist to load
+    if GIST_ID == "" then return end
     
     local req = getRequest()
     if not req then return end
@@ -1372,8 +1360,14 @@ local function loadExistingGist()
             local fileContent = data.files[GIST_FILENAME].content
             local gistData = HttpService:JSONDecode(fileContent)
             
-            -- Merge existing brainrots
             currentGistData.brainrots = gistData.brainrots or {}
+            
+            -- ✅ FIX: Track existing entries
+            for _, br in ipairs(currentGistData.brainrots) do
+                local key = br.serverId .. "|" .. br.name .. "|" .. br.mutation .. "|" .. br.traits
+                gistEntryKeys[key] = true
+            end
+            
             print("[Gist] Loaded", #currentGistData.brainrots, "existing entries")
         end
     end)
@@ -1383,21 +1377,32 @@ local function loadExistingGist()
     end
 end
 
--- Load existing data before scanning starts
 task.spawn(loadExistingGist)
+
+-- ✅ FIX: More reliable Gist update with retry logic
+local gistUpdateInProgress = false
+local pendingGistUpdate = false
 
 local function updateGist()
     if not UPDATE_GIST or GITHUB_TOKEN == "" then
         return
     end
+    
+    if gistUpdateInProgress then
+        pendingGistUpdate = true
+        return
+    end
+    
+    gistUpdateInProgress = true
+    pendingGistUpdate = false
 
     local req = getRequest()
     if not req then
         warn("[Gist] No HTTP request function available")
+        gistUpdateInProgress = false
         return
     end
 
-    -- Update player count
     currentGistData.playerCount = #Players:GetPlayers()
     currentGistData.timestamp = os.time()
 
@@ -1415,11 +1420,9 @@ local function updateGist()
 
     local url, method
     if GIST_ID == "" then
-        -- Create new Gist
         url = "https://api.github.com/gists"
         method = "POST"
     else
-        -- Update existing Gist
         url = "https://api.github.com/gists/" .. GIST_ID
         method = "PATCH"
     end
@@ -1439,13 +1442,12 @@ local function updateGist()
         if response.StatusCode == 200 or response.StatusCode == 201 then
             local data = HttpService:JSONDecode(response.Body)
             
-            -- Save Gist ID if we just created it
             if GIST_ID == "" then
                 GIST_ID = data.id
                 print("[Gist] Created new Gist:", GIST_ID)
                 print("[Gist] Raw URL:", data.files[GIST_FILENAME].raw_url)
             else
-                print("[Gist] Updated successfully")
+                print("[Gist] Updated successfully -", #currentGistData.brainrots, "entries")
             end
             
             return true
@@ -1455,21 +1457,24 @@ local function updateGist()
         end
     end)
 
+    gistUpdateInProgress = false
+    
     if not success then
         warn("[Gist] Error updating:", result)
     end
+    
+    -- ✅ FIX: Process pending update if one was queued
+    if pendingGistUpdate then
+        task.delay(0.5, updateGist)
+    end
 end
 
--- Queue Gist updates (don't spam GitHub API)
-local gistUpdateQueued = false
 local function queueGistUpdate()
-    if gistUpdateQueued then return end
-    gistUpdateQueued = true
-
-    task.delay(1, function() -- Update every 5 seconds max
-        gistUpdateQueued = false
-        updateGist()
-    end)
+    if not gistUpdateInProgress then
+        task.delay(0.5, updateGist)
+    else
+        pendingGistUpdate = true
+    end
 end
 
 --// HELPERS
@@ -1483,7 +1488,6 @@ end
 
 local function short(n)
     n = tonumber(n) or 0
-
     local abs = math.abs(n)
     local suffixes = {
         {1e12, "T"},
@@ -1491,7 +1495,6 @@ local function short(n)
         {1e6, "M"},
         {1e3, "K"}
     }
-
     for _, s in ipairs(suffixes) do
         local value, suffix = s[1], s[2]
         if abs >= value then
@@ -1499,14 +1502,12 @@ local function short(n)
             return string.format("%.2f", num):gsub("%.00$", "") .. suffix
         end
     end
-
     return tostring(n)
 end
 
 local function normalizeMutation(m)
     m = tostring(m or "Default")
-    m = m:gsub("%s+", "") -- optional: remove spaces
-    -- Force consistent casing for common ones
+    m = m:gsub("%s+", "")
     local map = {
         default = "Default",
         gold = "Gold",
@@ -1536,113 +1537,72 @@ local function normalizeKey(raw)
     return normalizeBrainrotName(raw):lower()
 end
 
-local function comma(n)
-    local s = tostring(math.floor(tonumber(n) or 0))
-    return s:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
-end
-
 local function parseTraits(traitString)
     if not traitString then return {} end
-
     local result, seen = {}, {}
-
     for part in string.gmatch(tostring(traitString), "[^,]+") do
-        local clean = part
-            :gsub("%s*[xX]%d+", "")     -- remove " x2" / "X3" if it ever appears
-            :gsub("^%s+", ""):gsub("%s+$", "") -- trim
-
+        local clean = part:gsub("%s*[xX]%d+", ""):gsub("^%s+", ""):gsub("%s+$", "")
         if clean ~= "" and not seen[clean] then
             seen[clean] = true
             table.insert(result, clean)
         end
     end
-
     return result
 end
 
-
--- ✅ BEST: Attribute -> ValueObject -> Descendants -> Name tags
 local function getMutation(obj)
     if not obj then return nil end
-
-    -- 1) Attribute
     local attr = obj:GetAttribute("Mutation")
     if attr ~= nil then return tostring(attr) end
-
-    -- 2) ValueObject direct
     local v = obj:FindFirstChild("Mutation")
-    if v and v:IsA("ValueBase") then
-        return tostring(v.Value)
-    end
-
-    -- 3) ValueObject anywhere inside model
+    if v and v:IsA("ValueBase") then return tostring(v.Value) end
     for _, d in ipairs(obj:GetDescendants()) do
         if d.Name == "Mutation" and d:IsA("ValueBase") then
             return tostring(d.Value)
         end
     end
-
-    -- 4) Parse from name tags
     local tag = obj.Name:match("%[(.-)%]") or obj.Name:match("%((.-)%)")
     if tag then return tag end
-
     return nil
 end
 
 local function getTrait(obj)
     if not obj then return nil end
-
-    -- 1) Attribute
     local attr = obj:GetAttribute("Traits")
     if attr ~= nil then return tostring(attr) end
-
-    -- 2) ValueObject direct
     local v = obj:FindFirstChild("Traits")
-    if v and v:IsA("ValueBase") then
-        return tostring(v.Value)
-    end
-
-    -- 3) ValueObject anywhere inside model
+    if v and v:IsA("ValueBase") then return tostring(v.Value) end
     for _, d in ipairs(obj:GetDescendants()) do
         if d.Name == "Traits" and d:IsA("ValueBase") then
             return tostring(d.Value)
         end
     end
-
     return nil
 end
 
 local function computeIncome(baseIncome, mutation, traitString)
     local base = tonumber(baseIncome) or 0
-
     mutation = normalizeMutation(mutation)
     local mMult = mutationMultipliers[mutation] or 1
-
     local rawTraits = parseTraits(traitString)
-
     local mults = {}
     local displayTraits = {}
     local seen = {}
 
     for _, rawTrait in ipairs(rawTraits) do
-        local tName = traitAliases[rawTrait] or rawTrait  -- ✅ map for BOTH calc + display
-
-        -- for calculation
+        local tName = traitAliases[rawTrait] or rawTrait
         local tMult = traits[tName]
         if tMult then
             table.insert(mults, tMult)
         else
             warn("[Brainrot] Unknown trait:", rawTrait, "mapped:", tName)
         end
-
-        -- for webhook display (dedupe)
         if not seen[tName] then
             seen[tName] = true
             table.insert(displayTraits, tName)
         end
     end
 
-    -- include mutation only if it actually does something
     if mMult > 1 then
         table.insert(mults, mMult)
     end
@@ -1652,7 +1612,6 @@ local function computeIncome(baseIncome, mutation, traitString)
     end
 
     table.sort(mults, function(a,b) return a > b end)
-
     local sum = mults[1]
     for i = 2, #mults do
         local reduced = mults[i] - 1
@@ -1664,7 +1623,7 @@ local function computeIncome(baseIncome, mutation, traitString)
     return math.floor(base * sum), displayTraits
 end
 
---// LOOKUP SET (normalized)
+--// LOOKUP SET
 local brainrotSet = {}
 for _, n in ipairs(brainrots) do
     brainrotSet[normalizeKey(n)] = true
@@ -1683,7 +1642,7 @@ local function normalizeMap(map)
 end
 
 rarityByName = normalizeMap(rarityByName)
-costByName   = normalizeMap(costByName)
+costByName = normalizeMap(costByName)
 incomeByName = normalizeMap(incomeByName)
 
 local newPing = {}
@@ -1693,16 +1652,6 @@ end
 PING_NAMES = newPing
 
 --// WEBHOOK
-local HttpService = game:GetService("HttpService")
-
-local function getRequest()
-    return (syn and syn.request)
-        or (http and http.request)
-        or http_request
-        or request
-end
-
--- Discord limits
 local MAX_FIELDS_PER_EMBED = 25
 local MAX_EMBEDS_PER_MESSAGE = 10
 
@@ -1719,14 +1668,22 @@ local function chunkArray(arr, chunkSize)
 end
 
 local function sendWebhookPayload(req, payload)
-    local res = req({
-        Url = WEBHOOK_URL,
-        Method = "POST",
-        Headers = { ["Content-Type"] = "application/json" },
-        Body = HttpService:JSONEncode(payload)
-    })
-    print("Webhook status:", res and res.StatusCode, "body:", res and res.Body)
-    return res
+    local success, res = pcall(function()
+        return req({
+            Url = WEBHOOK_URL,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode(payload)
+        })
+    end)
+    
+    if success and res then
+        print("[Webhook] Sent successfully, status:", res.StatusCode)
+        return true
+    else
+        warn("[Webhook] Failed to send:", res)
+        return false
+    end
 end
 
 local function sendWebhookGrouped(entries)
@@ -1734,11 +1691,10 @@ local function sendWebhookGrouped(entries)
 
     local req = getRequest()
     if not req then
-        warn("Webhook: no request function found")
+        warn("[Webhook] No request function found")
         return
     end
 
-    -- group by rarity
     local groups = {}
     for _, e in ipairs(entries) do
         local r = e.rarity or "Unknown"
@@ -1746,8 +1702,6 @@ local function sendWebhookGrouped(entries)
         table.insert(groups[r], e)
     end
 
-    -- order rarities (define somewhere above!)
-    -- RARITY_ORDER = { Secret=4, God=3, Burat=2, OG=1, Unknown=0 }
     local rarities = {}
     for r,_ in pairs(groups) do table.insert(rarities, r) end
     table.sort(rarities, function(a,b)
@@ -1756,38 +1710,31 @@ local function sendWebhookGrouped(entries)
 
     local t = os.date("!*t")
     local timestamp = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.min, t.sec)
-    local playerCount = #game:GetService("Players"):GetPlayers()
+    local playerCount = #Players:GetPlayers()
 
-    -- Build ALL embeds first, then send them in chunks of 10 embeds per webhook
     local allEmbeds = {}
 
     for _, rarity in ipairs(rarities) do
         local bucket = groups[rarity]
-
-        -- sort inside rarity by income desc
         table.sort(bucket, function(a,b)
             return (a.income or 0) > (b.income or 0)
         end)
 
-        -- brainrot fields (1 field per brainrot)
         local brainrotFields = {}
         for _, e in ipairs(bucket) do
             local fname = ("💵 %s/s"):format(short(e.income))
-            local fval  = e.line
-
+            local fval = e.line
             table.insert(brainrotFields, {
                 name = clampStr(fname, 256),
                 value = clampStr(fval, 1024),
                 inline = false
             })
         end
-        -- chunk brainrots into embeds (25 fields max), BUT we also want JobId + Players fields
-        -- so reserve 2 fields for those => only 23 brainrot fields per embed
+
         local PER_EMBED_BRAINROT_FIELDS = MAX_FIELDS_PER_EMBED - 2
         local fieldChunks = chunkArray(brainrotFields, PER_EMBED_BRAINROT_FIELDS)
 
         for idx, fchunk in ipairs(fieldChunks) do
-            -- append the copy-friendly fields at the bottom of EACH embed
             table.insert(fchunk, {
                 name = "Server ID",
                 value = "```" .. game.JobId .. "```",
@@ -1797,32 +1744,22 @@ local function sendWebhookGrouped(entries)
             table.insert(allEmbeds, {
                 title = (#fieldChunks > 1)
                     and ("Found Brainrots — %s (%d/%d)"):format(rarity, idx, #fieldChunks)
-                    or  ("Found Brainrots — %s"):format(rarity),
-
+                    or ("Found Brainrots — %s"):format(rarity),
                 url = "https://www.roblox.com/games/start?placeId=109983668079237&gameInstanceId="..game.JobId,
-
                 description = "",
-
                 color = RARITY_COLOR[rarity] or RARITY_COLOR["Unknown"],
-
                 thumbnail = {url = "https://static.wikia.nocookie.net/stealabr/images/e/e3/Tung_Tung_Tung_Sahur.png/revision/latest?cb=20260125163843"},
-
                 footer = {text = player.Name .. " | " .. tostring(playerCount) .. "/8👤"},
-
                 fields = fchunk,
-
                 timestamp = timestamp
             })
         end
     end
 
-    -- ✅ Multi-send: split embeds into batches of 10 embeds per webhook message
     local embedBatches = chunkArray(allEmbeds, MAX_EMBEDS_PER_MESSAGE)
 
     for i, embedBatch in ipairs(embedBatches) do
-        -- only ping on the FIRST message (so you don't spam @everyone multiple times)
         local contentForThis = (i == 1) and Content or ""
-
         local payload = {
             content = contentForThis,
             username = "Cly Notify",
@@ -1833,44 +1770,47 @@ local function sendWebhookGrouped(entries)
 
         sendWebhookPayload(req, payload)
 
-        -- small delay so Discord doesn't rate limit you as hard
         if i < #embedBatches then
             task.wait(0.35)
         end
     end
 end
 
--- batch sending
+-- ✅ FIX: Better batch management
 local globalFound = {}
 local webhookQueued = false
-
+local webhookTimer = nil
 
 local function queueWebhookSend()
-    if webhookQueued then return end
-    webhookQueued = true
-
-    task.delay(SEND_DELAY, function()
+    if webhookTimer then
+        webhookTimer:Cancel()
+    end
+    
+    webhookTimer = task.delay(SEND_DELAY, function()
         webhookQueued = false
+        webhookTimer = nil
+        
         if #globalFound == 0 then return end
 
-        -- ✅ set ping content here (only once per batch)
+        -- ✅ FIX: Set ping content BEFORE sending
         Content = globalShouldPing and "@everyone" or ""
-
+        
+        print("[Webhook] Sending batch of", #globalFound, "items, ping:", globalShouldPing)
         sendWebhookGrouped(globalFound)
 
         table.clear(globalFound)
         globalShouldPing = false
-        Content = "" -- reset
+        Content = ""
     end)
+    
+    webhookQueued = true
 end
 
---// SCANNING (per plot)
-local reported = {}   -- reported[plot][key] = true
-local scanQueued = {} -- scanQueued[plot] = true
-local plotConns = {} -- plotConns[plot] = RBXScriptConnection
+--// SCANNING
+local reported = {}
+local scanQueued = {}
+local plotConns = {}
 
-
---// Modified scanPlot to update Gist
 local function scanPlot(plot)
     if not plot or not plot.Parent then return end
     reported[plot] = reported[plot] or {}
@@ -1895,29 +1835,36 @@ local function scanPlot(plot)
                     local baseIncome = incomeByName[cleanName] or 0
 
                     local finalIncome, traitList = computeIncome(baseIncome, mutation, trait)
-if finalIncome >= MIN_INCOME then
-    local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
-    local mutationText = mutation or "None"
-    -- Check if this should trigger ping (high-value)
-    local shouldPing = finalIncome >= PING_MIN or PING_NAMES[cleanName]
-    
+                    
+                    if finalIncome >= MIN_INCOME then
+                        local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
+                        local mutationText = mutation or "None"
+                        
+                        local shouldPing = finalIncome >= PING_MIN or PING_NAMES[cleanName]
+                        
                         if shouldPing then
                             globalShouldPing = true
-                            
-                            -- 🔹 Only add to Gist if it's ping-worthy
-                            table.insert(currentGistData.brainrots, {
-                                name = displayName,
-                                rarity = rarity,
-                                mutation = mutationText,
-                                traits = traitText,
-                                income = finalIncome,
-                                cost = cost,
-                                serverId = game.JobId,  -- Needed for cleanup
-                                foundAt = os.time()     -- Needed for cleanup
-                            })
                         end
 
-                        local label = ("**%s** | **%s** | 🧬 **%s** | 💰 **$%s** | 🌀 **%s**" )
+                        -- ✅ Only add ping-worthy brainrots to Gist (≥300M or special names)
+                        if shouldPing then
+                            local gistKey = game.JobId .. "|" .. displayName .. "|" .. mutationText .. "|" .. traitText
+                            if not gistEntryKeys[gistKey] then
+                                gistEntryKeys[gistKey] = true
+                                table.insert(currentGistData.brainrots, {
+                                    name = displayName,
+                                    rarity = rarity,
+                                    mutation = mutationText,
+                                    traits = traitText,
+                                    income = finalIncome,
+                                    cost = cost,
+                                    serverId = game.JobId,
+                                    foundAt = os.time()
+                                })
+                            end
+                        end
+
+                        local label = ("**%s** | **%s** | 🧬 **%s** | 💰 **$%s** | 🌀 **%s**")
                             :format(displayName, rarity, mutationText, short(cost), traitText)
 
                         table.insert(foundList, {
@@ -1936,23 +1883,19 @@ if finalIncome >= MIN_INCOME then
             table.insert(globalFound, line)
         end
         queueWebhookSend()
-        queueGistUpdate() -- 🔹 Update Gist when brainrots found
-        print("found in plot:", plot.Name, "count:", #foundList)
+        queueGistUpdate()
+        print("[Scanner] Found", #foundList, "brainrots in plot:", plot.Name)
     end
 end
 
 local function hookPlot(plot)
-
-    -- 🔹 disconnect old connection if this plot was already hooked
     if plotConns[plot] then
         plotConns[plot]:Disconnect()
         plotConns[plot] = nil
     end
 
-    -- 🔹 initial scan
     scanPlot(plot)
 
-    -- 🔹 connect listener
     plotConns[plot] = plot.DescendantAdded:Connect(function()
         if scanQueued[plot] then return end
         scanQueued[plot] = true
@@ -1966,12 +1909,10 @@ local function hookPlot(plot)
     end)
 end
 
--- hook existing
 for _, plot in ipairs(plotsFolder:GetChildren()) do
     hookPlot(plot)
 end
 
--- hook new
 plotsFolder.ChildAdded:Connect(function(plot)
     task.delay(0.1, function()
         hookPlot(plot)
@@ -1981,45 +1922,42 @@ end)
 plotsFolder.ChildRemoved:Connect(function(plot)
     reported[plot] = nil
     scanQueued[plot] = nil
-
     if plotConns[plot] then
         plotConns[plot]:Disconnect()
         plotConns[plot] = nil
     end
 end)
 
--- 🔹 Initial Gist update
 task.delay(2, function()
     updateGist()
 end)
 
--- 🔹 Periodic Gist updates (keep it fresh)
 task.spawn(function()
     while true do
-        task.wait(10) -- Update every 30 seconds
+        task.wait(30)
         if #currentGistData.brainrots > 0 then
             updateGist()
         end
     end
 end)
 
--- 🔹 Clean up old entries (ADD THIS NEW SECTION)
+-- ✅ FIX: Better cleanup logic
 task.spawn(function()
     while true do
-        task.wait(60) -- Check every 1 minute
+        task.wait(60)
         
         local now = os.time()
         local cleaned = {}
-        local seen = {}
+        local newKeys = {}
         
         for _, brainrot in ipairs(currentGistData.brainrots) do
             local age = now - brainrot.foundAt
             
-            if age < 300 then -- Keep if less than 5 minutes old
-                local key = brainrot.serverId .. "|" .. brainrot.name .. "|" .. brainrot.mutation
+            if age < 300 then
+                local key = brainrot.serverId .. "|" .. brainrot.name .. "|" .. brainrot.mutation .. "|" .. brainrot.traits
                 
-                if not seen[key] then
-                    seen[key] = true
+                if not newKeys[key] then
+                    newKeys[key] = true
                     table.insert(cleaned, brainrot)
                 end
             end
@@ -2028,8 +1966,11 @@ task.spawn(function()
         local removed = #currentGistData.brainrots - #cleaned
         if removed > 0 then
             currentGistData.brainrots = cleaned
+            gistEntryKeys = newKeys
             updateGist()
             print("[Gist] Cleaned", removed, "old entries. Active:", #cleaned)
         end
     end
 end)
+
+print("[Scanner] Initialized successfully!")
