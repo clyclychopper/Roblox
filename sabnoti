@@ -10,6 +10,11 @@ local GIST_ID = getgenv().GistID or ""
 local GIST_FILENAME = "brainrot_server.json"
 local UPDATE_GIST = true
 
+-- Debug: Print credentials status
+print("[Config] Webhook:", WEBHOOK_URL and "✅ Set" or "❌ Missing")
+print("[Config] GitHub Token:", GITHUB_TOKEN and "✅ Set" or "❌ Missing")
+print("[Config] Gist ID:", GIST_ID ~= "" and GIST_ID or "❌ Empty (will create new)")
+
 local MIN_INCOME = 10000000
 local SEND_DELAY = 3
 local SCAN_DELAY = 1.5
@@ -1385,11 +1390,13 @@ local pendingGistUpdate = false
 
 local function updateGist()
     if not UPDATE_GIST or GITHUB_TOKEN == "" then
+        warn("[Gist] Update skipped - UPDATE_GIST:", UPDATE_GIST, "TOKEN:", GITHUB_TOKEN ~= "")
         return
     end
     
     if gistUpdateInProgress then
         pendingGistUpdate = true
+        print("[Gist] Update already in progress, queuing...")
         return
     end
     
@@ -1405,6 +1412,8 @@ local function updateGist()
 
     currentGistData.playerCount = #Players:GetPlayers()
     currentGistData.timestamp = os.time()
+    
+    print("[Gist] Attempting update with", #currentGistData.brainrots, "brainrots...")
 
     local gistContent = HttpService:JSONEncode(currentGistData)
 
@@ -1428,6 +1437,7 @@ local function updateGist()
     end
 
     local success, result = pcall(function()
+        print("[Gist] Sending", method, "request to:", url)
         local response = req({
             Url = url,
             Method = method,
@@ -1439,20 +1449,25 @@ local function updateGist()
             Body = HttpService:JSONEncode(gistPayload)
         })
 
+        print("[Gist] Response status:", response.StatusCode)
+        
         if response.StatusCode == 200 or response.StatusCode == 201 then
             local data = HttpService:JSONDecode(response.Body)
             
             if GIST_ID == "" then
                 GIST_ID = data.id
-                print("[Gist] Created new Gist:", GIST_ID)
+                getgenv().GistID = GIST_ID  -- Save for next time
+                print("[Gist] ✅ Created new Gist:", GIST_ID)
                 print("[Gist] Raw URL:", data.files[GIST_FILENAME].raw_url)
+                print("[Gist] ⚠️ IMPORTANT: Add this to your script: getgenv().GistID = \"" .. GIST_ID .. "\"")
             else
-                print("[Gist] Updated successfully -", #currentGistData.brainrots, "entries")
+                print("[Gist] ✅ Updated successfully -", #currentGistData.brainrots, "entries")
             end
             
             return true
         else
-            warn("[Gist] Failed:", response.StatusCode, response.Body)
+            warn("[Gist] ❌ Failed:", response.StatusCode)
+            warn("[Gist] Response:", response.Body)
             return false
         end
     end)
