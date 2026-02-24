@@ -1,20 +1,26 @@
 local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
 
+-- ANTI AFK
+player.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
 
 local FIRE_DISTANCE = 5
 local DEBOUNCE = 3
-local REFIRE_COOLDOWN = 8 -- seconds before same target can be fired again
+local REFIRE_COOLDOWN = 8
 local lastFired = 0
 local isBusy = false
 
 local renderedFolder = workspace:WaitForChild("RenderedMovingAnimals")
 
--- tracks recently fired prompts so we dont follow them again
-local recentlyFired = {} -- [prompt] = tick() when fired
+local recentlyFired = {}
 
 local function cleanRecentlyFired()
     local now = tick()
@@ -25,7 +31,6 @@ local function cleanRecentlyFired()
     end
 end
 
---// HELPERS
 local function matchesTarget(objectText)
     for _, name in ipairs(getgenv().targetNames) do
         if objectText:lower():find(name:lower(), 1, true) then
@@ -63,7 +68,6 @@ local function findClosestPrompt()
         if obj:IsA("ProximityPrompt") and obj.ActionText == "Purchase" then
             local matches, matchedName = matchesTarget(obj.ObjectText)
             if matches and isAnimalRendered(matchedName) then
-                -- skip if recently fired
                 if not recentlyFired[obj] then
                     local part = getPromptPart(obj)
                     if part then
@@ -122,7 +126,7 @@ local function findAndFire()
                     fireproximityprompt(lockedPrompt)
                     print("Fired:", lockedPrompt.ObjectText, "| Dist:", math.floor(finalDist))
                     lastFired = tick()
-                    recentlyFired[lockedPrompt] = tick() -- mark as fired
+                    recentlyFired[lockedPrompt] = tick()
                     fired = true
                 end
             end
@@ -139,7 +143,7 @@ local function findAndFire()
     isBusy = false
 end
 
---// RESPAWN HANDLER
+-- RESPAWN HANDLER
 player.CharacterAdded:Connect(function(char)
     character = char
     rootPart = char:WaitForChild("HumanoidRootPart")
@@ -149,18 +153,18 @@ player.CharacterAdded:Connect(function(char)
     recentlyFired = {}
 end)
 
---// BACKGROUND LOOP
+-- BACKGROUND LOOP
 task.spawn(function()
     while true do
         task.wait(0.5)
-
         if getgenv().AutoBuyerEnabled then
             findAndFire()
         end
     end
 end)
 
-print("Watching for", #targetNames, "targets:")
-for _, name in ipairs(getgenv.().targetNames) do
+-- Fixed typo: getgenv.() -> getgenv()
+print("Watching for", #getgenv().targetNames, "targets:")
+for _, name in ipairs(getgenv().targetNames) do
     print(" -", name)
 end
