@@ -258,24 +258,31 @@ local function findClosestPrompt()
 
     local closestPrompt, closestPart, closestDist, closestMatchedName = nil, nil, math.huge, nil
 
-    -- ONLY search inside RenderedMovingAnimals folder for active prompts
-    for _, obj in ipairs(renderedFolder:GetDescendants()) do
+    -- Search in WORKSPACE (not renderedFolder) for all prompts
+    for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("ProximityPrompt") and obj.ActionText == "Purchase" then
-            local matches, matchedName = matchesTarget(obj.ObjectText)
-            if matches and isAnimalRendered(matchedName) then
-                if not recentlyFired[obj] then
-                    local part = getPromptPart(obj)
-                    if part then
-                        local dist = (rootPart.Position - part.Position).Magnitude
-                        if dist < closestDist then
-                            closestDist = dist
-                            closestPrompt = obj
-                            closestPart = part
-                            closestMatchedName = matchedName
-                        end
+            -- Extract the animal name (remove the price part like "$25K")
+            local promptName = obj.ObjectText:match("^([^$]+)"):gsub("%s+$", "")  -- Remove trailing whitespace and price
+            
+            -- Check if this animal is currently rendered
+            local isRendered = false
+            for _, child in ipairs(renderedFolder:GetChildren()) do
+                if child.Name:lower() == promptName:lower() then
+                    isRendered = true
+                    break
+                end
+            end
+            
+            if isRendered and not recentlyFired[obj] then
+                local part = getPromptPart(obj)
+                if part then
+                    local dist = (rootPart.Position - part.Position).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        closestPrompt = obj
+                        closestPart = part
+                        closestMatchedName = promptName
                     end
-                else
-                    print("[AutoBuyer] Skipping prompt (on cooldown):", obj.ObjectText)
                 end
             end
         end
@@ -309,35 +316,72 @@ local function findAndFire()
     local timeout = tick() + 15
 
     while tick() < timeout do
-        if not lockedPrompt or not lockedPrompt.Parent or not lockedPart or not lockedPart.Parent then
-            print("[AutoBuyer] Locked prompt/part destroyed, aborting.")
-            break
-        end
-
         if not isAnimalRendered(lockedName) then
             print("[AutoBuyer] Animal '" .. lockedName .. "' no longer rendered, aborting.")
             recentlyFired[lockedPrompt] = nil
             break
         end
 
-        local currentDist = (rootPart.Position - lockedPart.Position).Magnitude
+        -- Find the closest prompt of the target animal in WORKSPACE
+        local closestPromptToMe = nil
+        local closestPromptDist = math.huge
+        
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") and obj.ActionText == "Purchase" then
+                local promptName = obj.ObjectText:match("^([^$]+)"):gsub("%s+$", "")
+                if promptName:lower() == lockedName:lower() then
+                    local part = getPromptPart(obj)
+                    if part and part.Parent then
+                        local dist = (rootPart.Position - part.Position).Magnitude
+                        if dist < closestPromptDist then
+                            closestPromptDist = dist
+                            closestPromptToMe = obj
+                        end
+                    end
+                end
+            end
+        end
+
+        if not closestPromptToMe or not closestPromptToMe.Parent then
+            print("[AutoBuyer] Locked prompt destroyed, aborting.")
+            break
+        end
+
+        local currentDist = closestPromptDist
         print(string.format("[AutoBuyer] Moving to '%s' | Dist: %.2f", lockedName, currentDist))
-        humanoid:MoveTo(lockedPart.Position)
+        humanoid:MoveTo(getPromptPart(closestPromptToMe).Position)
 
         if currentDist <= FIRE_DISTANCE then
             task.wait(0.15)
-            if lockedPrompt and lockedPrompt.Parent then
-                local finalDist = (rootPart.Position - lockedPart.Position).Magnitude
-                if finalDist <= FIRE_DISTANCE then
-                    print("[AutoBuyer] Firing prompt for: " .. lockedName)
-                    fireproximityprompt(lockedPrompt)
-                    lastFired = tick()
-                    recentlyFired[lockedPrompt] = tick()
-                    fired = true
-                    print("[AutoBuyer] Successfully fired! Cooldown started for: " .. lockedName)
-                else
-                    print(string.format("[AutoBuyer] Too far after wait: %.2f, retrying...", finalDist))
+            
+            -- Refind the closest prompt in case it changed
+            local finalPrompt = nil
+            local finalDist = math.huge
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("ProximityPrompt") and obj.ActionText == "Purchase" then
+                    local promptName = obj.ObjectText:match("^([^$]+)"):gsub("%s+$", "")
+                    if promptName:lower() == lockedName:lower() then
+                        local part = getPromptPart(obj)
+                        if part and part.Parent then
+                            local dist = (rootPart.Position - part.Position).Magnitude
+                            if dist < finalDist then
+                                finalDist = dist
+                                finalPrompt = obj
+                            end
+                        end
+                    end
                 end
+            end
+
+            if finalPrompt and finalPrompt.Parent and finalDist <= FIRE_DISTANCE then
+                print("[AutoBuyer] Firing prompt for: " .. lockedName)
+                fireproximityprompt(finalPrompt)
+                lastFired = tick()
+                recentlyFired[finalPrompt] = tick()
+                fired = true
+                print("[AutoBuyer] Successfully fired! Cooldown started for: " .. lockedName)
+            else
+                print(string.format("[AutoBuyer] Too far after wait: %.2f, retrying...", finalDist))
             end
             break
         end
