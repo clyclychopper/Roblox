@@ -258,7 +258,8 @@ local function findClosestPrompt()
 
     local closestPrompt, closestPart, closestDist, closestMatchedName = nil, nil, math.huge, nil
 
-    for _, obj in ipairs(workspace:GetDescendants()) do
+    -- ONLY search inside RenderedMovingAnimals folder for active prompts
+    for _, obj in ipairs(renderedFolder:GetDescendants()) do
         if obj:IsA("ProximityPrompt") and obj.ActionText == "Purchase" then
             local matches, matchedName = matchesTarget(obj.ObjectText)
             if matches and isAnimalRendered(matchedName) then
