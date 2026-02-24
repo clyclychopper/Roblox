@@ -13,18 +13,13 @@ local isBusy = false
 local renderedFolder = workspace:WaitForChild("RenderedMovingAnimals")
 local recentlyFired = {}
 
--- ANTI AFK (Delta Mobile + PC Compatible)
--- ANTI AFK (PC + Delta Mobile Compatible)
-local antiAfkRunning = true
-
+-- ANTI AFK (PC + Delta Mobile)
 spawn(function()
-    while antiAfkRunning do
+    while true do
         wait(60)
-        -- Method 1: player move (works on mobile/delta)
         pcall(function()
             player:Move(Vector3.new(0, 0, 0), true)
         end)
-        -- Method 2: camera nudge (works on PC)
         pcall(function()
             local cam = workspace.CurrentCamera
             local cf = cam.CFrame
@@ -35,11 +30,8 @@ spawn(function()
     end
 end)
 
--- Backup: fires when Roblox detects idle
 player.Idled:Connect(function()
-    pcall(function()
-        player:Move(Vector3.new(0, 0, 0), true)
-    end)
+    pcall(function() player:Move(Vector3.new(0, 0, 0), true) end)
     pcall(function()
         local cam = workspace.CurrentCamera
         local cf = cam.CFrame
@@ -47,11 +39,6 @@ player.Idled:Connect(function()
         wait(0.1)
         cam.CFrame = cf
     end)
-end)
-
--- Also use idled event as backup
-player.Idled:Connect(function()
-    player:Move(Vector3.new(0, 0, 0), true)
 end)
 
 local function cleanRecentlyFired()
@@ -127,7 +114,6 @@ local function findAndFire()
     local prompt, part, dist, matchedName = findClosestPrompt()
     if not prompt or not part then return end
 
-    print("Locking onto:", prompt.ObjectText, "| Dist:", math.floor(dist))
     isBusy = true
 
     local lockedPrompt = prompt
@@ -138,12 +124,10 @@ local function findAndFire()
 
     while tick() < timeout do
         if not lockedPrompt or not lockedPrompt.Parent or not lockedPart or not lockedPart.Parent then
-            warn("Prompt disappeared")
             break
         end
 
         if not isAnimalRendered(lockedName) then
-            warn("Animal despawned mid-walk")
             break
         end
 
@@ -156,7 +140,6 @@ local function findAndFire()
                 local finalDist = (rootPart.Position - lockedPart.Position).Magnitude
                 if finalDist <= FIRE_DISTANCE then
                     fireproximityprompt(lockedPrompt)
-                    print("Fired:", lockedPrompt.ObjectText, "| Dist:", math.floor(finalDist))
                     lastFired = tick()
                     recentlyFired[lockedPrompt] = tick()
                     fired = true
@@ -168,14 +151,9 @@ local function findAndFire()
         task.wait(0.1)
     end
 
-    if not fired then
-        warn("Did not fire, retrying")
-    end
-
     isBusy = false
 end
 
--- RESPAWN HANDLER
 player.CharacterAdded:Connect(function(char)
     character = char
     rootPart = char:WaitForChild("HumanoidRootPart")
@@ -185,7 +163,6 @@ player.CharacterAdded:Connect(function(char)
     recentlyFired = {}
 end)
 
--- BACKGROUND LOOP
 task.spawn(function()
     while true do
         task.wait(0.5)
@@ -194,8 +171,3 @@ task.spawn(function()
         end
     end
 end)
-
-print("Watching for", #getgenv().targetNames, "targets:")
-for _, name in ipairs(getgenv().targetNames) do
-    print(" -", name)
-end
