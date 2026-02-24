@@ -1,5 +1,218 @@
+getgenv().AutoBuyerEnabled = getgenv().AutoBuyerEnabled or false
+
+-- TARGET BRAINROTS
+getgenv().targetNames = getgenv().targetNames or {
+    "Girafa Celestre",
+    "Meowl",
+    "Skibidi Toilet",
+    "Strawberry Elephant",
+    "Secret Lucky Block",
+    "La Vacca Saturno Saturnita",
+    "Los Tralaleritos",
+    "Las Tralaleritas",
+    "Job Job Job Sahur",
+    "GOAT",
+    "Graipuss Medussi",
+    "To to to Sahur",
+    "Chicleteira Bicicleteira",
+    "Chicleteirina Bicicleteirina",
+    "La Grande Combinasion",
+    "Nuclearo Dinossauro",
+    "Money Money Puggy",
+    "Tang Tang Keletang",
+    "Ketupat Kepat",
+    "Tictac Sahur",
+    "Ketchuru and Musturu",
+    "Lavadorito Spinito",
+    "Garama and Madundung",
+    "Burguro And Fryuro",
+    "Capitano Moby",
+    "Cerberus",
+    "Dragon Cannelloni",
+    "Noobini Pizzanini"
+}
+
+-- ══════════════════════════════════════════════
+--               TOGGLE GUI
+-- ══════════════════════════════════════════════
+
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
 local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Remove old GUI if reinjecting
+if playerGui:FindFirstChild("AutoBuyerGUI") then
+    playerGui.AutoBuyerGUI:Destroy()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AutoBuyerGUI"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = playerGui
+
+-- Main frame (pill shape)
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 220, 0, 56)
+mainFrame.Position = UDim2.new(0, 16, 0, 16)
+mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 28)
+mainCorner.Parent = mainFrame
+
+-- Glowing border stroke
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(80, 220, 120)
+stroke.Thickness = 1.5
+stroke.Transparency = 0.3
+stroke.Parent = mainFrame
+
+-- Left status dot
+local dot = Instance.new("Frame")
+dot.Size = UDim2.new(0, 10, 0, 10)
+dot.Position = UDim2.new(0, 18, 0.5, -5)
+dot.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+dot.BorderSizePixel = 0
+dot.Parent = mainFrame
+
+local dotCorner = Instance.new("UICorner")
+dotCorner.CornerRadius = UDim.new(1, 0)
+dotCorner.Parent = dot
+
+-- Label
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, -100, 1, 0)
+label.Position = UDim2.new(0, 36, 0, 0)
+label.BackgroundTransparency = 1
+label.Text = "AUTO BUYER"
+label.Font = Enum.Font.GothamBold
+label.TextSize = 13
+label.TextColor3 = Color3.fromRGB(220, 220, 220)
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.Parent = mainFrame
+
+-- Status text (ON/OFF)
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0, 36, 1, 0)
+statusLabel.Position = UDim2.new(1, -96, 0, 0)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "OFF"
+statusLabel.Font = Enum.Font.GothamBold
+statusLabel.TextSize = 11
+statusLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
+statusLabel.TextXAlignment = Enum.TextXAlignment.Right
+statusLabel.Parent = mainFrame
+
+-- Toggle switch background
+local toggleBg = Instance.new("Frame")
+toggleBg.Size = UDim2.new(0, 46, 0, 26)
+toggleBg.Position = UDim2.new(1, -62, 0.5, -13)
+toggleBg.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+toggleBg.BorderSizePixel = 0
+toggleBg.Parent = mainFrame
+
+local toggleBgCorner = Instance.new("UICorner")
+toggleBgCorner.CornerRadius = UDim.new(1, 0)
+toggleBgCorner.Parent = toggleBg
+
+-- Toggle knob
+local knob = Instance.new("Frame")
+knob.Size = UDim2.new(0, 20, 0, 20)
+knob.Position = UDim2.new(0, 3, 0.5, -10)
+knob.BackgroundColor3 = Color3.fromRGB(120, 120, 130)
+knob.BorderSizePixel = 0
+knob.Parent = toggleBg
+
+local knobCorner = Instance.new("UICorner")
+knobCorner.CornerRadius = UDim.new(1, 0)
+knobCorner.Parent = knob
+
+-- Knob shine
+local shine = Instance.new("Frame")
+shine.Size = UDim2.new(0, 6, 0, 6)
+shine.Position = UDim2.new(0, 4, 0, 3)
+shine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+shine.BackgroundTransparency = 0.6
+shine.BorderSizePixel = 0
+shine.Parent = knob
+
+local shineCorner = Instance.new("UICorner")
+shineCorner.CornerRadius = UDim.new(1, 0)
+shineCorner.Parent = shine
+
+-- ═══════════════ TOGGLE LOGIC ═══════════════
+
+local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+
+local function updateVisuals(enabled)
+    if enabled then
+        TweenService:Create(knob, tweenInfo, {
+            Position = UDim2.new(0, 23, 0.5, -10),
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        }):Play()
+        TweenService:Create(toggleBg, tweenInfo, {
+            BackgroundColor3 = Color3.fromRGB(50, 210, 100)
+        }):Play()
+        TweenService:Create(dot, tweenInfo, {
+            BackgroundColor3 = Color3.fromRGB(50, 230, 100)
+        }):Play()
+        TweenService:Create(stroke, tweenInfo, {
+            Color = Color3.fromRGB(50, 210, 100),
+            Transparency = 0.1
+        }):Play()
+        statusLabel.Text = "ON"
+        statusLabel.TextColor3 = Color3.fromRGB(50, 210, 100)
+    else
+        TweenService:Create(knob, tweenInfo, {
+            Position = UDim2.new(0, 3, 0.5, -10),
+            BackgroundColor3 = Color3.fromRGB(120, 120, 130)
+        }):Play()
+        TweenService:Create(toggleBg, tweenInfo, {
+            BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+        }):Play()
+        TweenService:Create(dot, tweenInfo, {
+            BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        }):Play()
+        TweenService:Create(stroke, tweenInfo, {
+            Color = Color3.fromRGB(80, 80, 100),
+            Transparency = 0.5
+        }):Play()
+        statusLabel.Text = "OFF"
+        statusLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
+    end
+end
+
+toggleBg.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        getgenv().AutoBuyerEnabled = not getgenv().AutoBuyerEnabled
+        updateVisuals(getgenv().AutoBuyerEnabled)
+        print("[AutoBuyer] Toggled:", getgenv().AutoBuyerEnabled and "ON" or "OFF")
+    end
+end)
+
+-- Click anywhere on frame also works
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        -- only toggle if not dragging
+    end
+end)
+
+-- Set initial visuals
+updateVisuals(getgenv().AutoBuyerEnabled)
+
+-- ══════════════════════════════════════════════
+--               AUTOBUYER LOGIC
+-- ══════════════════════════════════════════════
+
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
@@ -13,13 +226,11 @@ local isBusy = false
 local renderedFolder = workspace:WaitForChild("RenderedMovingAnimals")
 local recentlyFired = {}
 
--- ANTI AFK (PC + Delta Mobile)
+-- ANTI AFK
 spawn(function()
     while true do
         wait(60)
-        pcall(function()
-            player:Move(Vector3.new(0, 0, 0), true)
-        end)
+        pcall(function() player:Move(Vector3.new(0, 0, 0), true) end)
         pcall(function()
             local cam = workspace.CurrentCamera
             local cf = cam.CFrame
@@ -79,10 +290,7 @@ end
 local function findClosestPrompt()
     cleanRecentlyFired()
 
-    local closestPrompt = nil
-    local closestPart = nil
-    local closestDist = math.huge
-    local closestMatchedName = nil
+    local closestPrompt, closestPart, closestDist, closestMatchedName = nil, nil, math.huge, nil
 
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("ProximityPrompt") and obj.ActionText == "Purchase" then
@@ -116,27 +324,15 @@ local function findClosestPrompt()
 end
 
 local function findAndFire()
-    if isBusy then
-        print("[AutoBuyer] Busy, skipping cycle.")
-        return
-    end
+    if isBusy then return end
     local now = tick()
-    if now - lastFired < DEBOUNCE then
-        print(string.format("[AutoBuyer] Debounce active. %.2fs remaining.", DEBOUNCE - (now - lastFired)))
-        return
-    end
+    if now - lastFired < DEBOUNCE then return end
 
     local prompt, part, dist, matchedName = findClosestPrompt()
-    if not prompt or not part then
-        print("[AutoBuyer] Nothing to do this cycle.")
-        return
-    end
+    if not prompt or not part then return end
 
     isBusy = true
     print(string.format("[AutoBuyer] Locking onto: '%s' | Starting dist: %.2f", matchedName, dist))
-
-    -- FIX: Mark as recently fired IMMEDIATELY when we lock on, not after firing
-    -- This prevents re-selecting the same target if isBusy resets mid-loop
     recentlyFired[prompt] = tick()
 
     local lockedPrompt = prompt
@@ -153,7 +349,6 @@ local function findAndFire()
 
         if not isAnimalRendered(lockedName) then
             print("[AutoBuyer] Animal '" .. lockedName .. "' no longer rendered, aborting.")
-            -- FIX: Remove from recentlyFired so it can be retried if it reappears
             recentlyFired[lockedPrompt] = nil
             break
         end
@@ -170,7 +365,6 @@ local function findAndFire()
                     print("[AutoBuyer] Firing prompt for: " .. lockedName)
                     fireproximityprompt(lockedPrompt)
                     lastFired = tick()
-                    -- Update the fired time (was pre-set above, now confirm with real fire time)
                     recentlyFired[lockedPrompt] = tick()
                     fired = true
                     print("[AutoBuyer] Successfully fired! Cooldown started for: " .. lockedName)
@@ -210,3 +404,5 @@ task.spawn(function()
         end
     end
 end)
+
+print("[AutoBuyer] Loaded! Use the toggle button to enable.")
