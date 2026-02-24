@@ -4,11 +4,18 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local Content = ""
 
-local WEBHOOK_URL = "https://discord.com/api/webhooks/1475066199342583848/tSwVV5wvoobDvA2cd0ZBJH3bELIEIxvFYswZ_mmVNLwzLgt9xo_k0fF-JT_P9dfw4GXz" -- <<<< change this
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1475066199342583848/tSwVV5wvoobDvA2cd0ZBJH3bELIEIxvFYswZ_mmVNLwzLgt9xo_k0fF-JT_P9dfw4GXz"
+
+-- 🔹 GitHub Gist Settings
+local GITHUB_TOKEN = "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" -- Your GitHub Personal Access Token
+local GIST_ID = "3aadaf473d91f8461122c772fb0e03e2" -- Paste this ID -- Your Gist ID (leave empty to create new)
+local GIST_FILENAME = "brainrot_server.json"
+local UPDATE_GIST = true -- Set to false to disable Gist updates
 
 local MIN_INCOME = 10000000
-local SEND_DELAY = 3     -- seconds to batch into 1 webhook
-local SCAN_DELAY = 1.5     -- seconds to wait after DescendantAdded (lets attributes/valueobjects load)
+local SEND_DELAY = 3
+local SCAN_DELAY = 1.5
+local PING_MIN = 300000000
 
 -- PING
 local PING_MIN = 300000000 -- 300m threshold for ping (change if you want)
@@ -1326,6 +1333,145 @@ local traitAliases = {
 }
 
 
+--// GIST UPLOADER
+local HttpService = game:GetService("HttpService")
+
+local function getRequest()
+    return (syn and syn.request)
+        or (http and http.request)
+        or http_request
+        or request
+end
+
+local currentGistData = {
+    jobId = game.JobId,
+    placeId = game.PlaceId,
+    timestamp = os.time(),
+    playerCount = 0,
+    brainrots = {}
+}
+
+-- 🔹 Load existing Gist data on startup
+local function loadExistingGist()
+    if GIST_ID == "" then return end -- No existing Gist to load
+    
+    local req = getRequest()
+    if not req then return end
+    
+    local success, result = pcall(function()
+        local response = req({
+            Url = "https://api.github.com/gists/" .. GIST_ID,
+            Method = "GET",
+            Headers = {
+                ["Authorization"] = "token " .. GITHUB_TOKEN,
+                ["User-Agent"] = "Roblox-Brainrot-Scanner"
+            }
+        })
+        
+        if response.StatusCode == 200 then
+            local data = HttpService:JSONDecode(response.Body)
+            local fileContent = data.files[GIST_FILENAME].content
+            local gistData = HttpService:JSONDecode(fileContent)
+            
+            -- Merge existing brainrots
+            currentGistData.brainrots = gistData.brainrots or {}
+            print("[Gist] Loaded", #currentGistData.brainrots, "existing entries")
+        end
+    end)
+    
+    if not success then
+        warn("[Gist] Failed to load existing data:", result)
+    end
+end
+
+-- Load existing data before scanning starts
+task.spawn(loadExistingGist)
+
+local function updateGist()
+    if not UPDATE_GIST or GITHUB_TOKEN == "" then
+        return
+    end
+
+    local req = getRequest()
+    if not req then
+        warn("[Gist] No HTTP request function available")
+        return
+    end
+
+    -- Update player count
+    currentGistData.playerCount = #Players:GetPlayers()
+    currentGistData.timestamp = os.time()
+
+    local gistContent = HttpService:JSONEncode(currentGistData)
+
+    local gistPayload = {
+        description = "Brainrot Server Info - " .. player.Name,
+        public = false,
+        files = {
+            [GIST_FILENAME] = {
+                content = gistContent
+            }
+        }
+    }
+
+    local url, method
+    if GIST_ID == "" then
+        -- Create new Gist
+        url = "https://api.github.com/gists"
+        method = "POST"
+    else
+        -- Update existing Gist
+        url = "https://api.github.com/gists/" .. GIST_ID
+        method = "PATCH"
+    end
+
+    local success, result = pcall(function()
+        local response = req({
+            Url = url,
+            Method = method,
+            Headers = {
+                ["Authorization"] = "token " .. GITHUB_TOKEN,
+                ["Content-Type"] = "application/json",
+                ["User-Agent"] = "Roblox-Brainrot-Scanner"
+            },
+            Body = HttpService:JSONEncode(gistPayload)
+        })
+
+        if response.StatusCode == 200 or response.StatusCode == 201 then
+            local data = HttpService:JSONDecode(response.Body)
+            
+            -- Save Gist ID if we just created it
+            if GIST_ID == "" then
+                GIST_ID = data.id
+                print("[Gist] Created new Gist:", GIST_ID)
+                print("[Gist] Raw URL:", data.files[GIST_FILENAME].raw_url)
+            else
+                print("[Gist] Updated successfully")
+            end
+            
+            return true
+        else
+            warn("[Gist] Failed:", response.StatusCode, response.Body)
+            return false
+        end
+    end)
+
+    if not success then
+        warn("[Gist] Error updating:", result)
+    end
+end
+
+-- Queue Gist updates (don't spam GitHub API)
+local gistUpdateQueued = false
+local function queueGistUpdate()
+    if gistUpdateQueued then return end
+    gistUpdateQueued = true
+
+    task.delay(1, function() -- Update every 5 seconds max
+        gistUpdateQueued = false
+        updateGist()
+    end)
+end
 
 --// HELPERS
 local function clampStr(s, maxLen)
@@ -1557,62 +1703,6 @@ local function getRequest()
         or request
 end
 
---[[ SENDWEBHOOK ONCE TEMPLATE
-local function sendWebhookOnce(lines)
-    if type(lines) ~= "table" or #lines == 0 then
-        return
-    end
-
-    local req = getRequest()
-    if not req then
-        warn("Webhook: no request function found")
-        return
-    end
-
-    local list = table.concat(lines, "\n\n")
-    if #list > 3900 then
-        list = list:sub(1, 3900) .. "\n\n..."
-    end
-
-    local t = os.date("!*t")
-    local timestamp = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.min, t.sec)
-
-    local playerCount = #game:GetService("Players"):GetPlayers()
-
-    local embed = {
-        title = "Brainrot Here My Nigga",
-        url = "https://www.roblox.com/games/start?placeId=109983668079237&gameInstanceId="..game.JobId,
-        description = list,
-        color = 0x00ffcc,
-        author = {
-        name = "Cly Notifier",
-        icon_url = "https://imgs.crazygames.com/steal-brainrot-online_1x1/20251117095739/steal-brainrot-online_1x1-cover?format=auto&quality=100&metadata=none&width=1200"
-    },
-        footer = { text = player.Name },
-        fields = {
-            { name = "JobId", value = "```" .. game.JobId .. "```", inline = false },
-            { name = "Players In Server", value = tostring(playerCount).."/8👤", inline = true }
-        },
-        timestamp = timestamp
-    }
-
-    local payload = {
-    content = Content,
-    embeds = { embed },
-    allowed_mentions = (Content ~= "" and { parse = {"everyone"} } or { parse = {} })
-    }
-
-    local res = req({
-        Url = WEBHOOK_URL,
-        Method = "POST",
-        Headers = { ["Content-Type"] = "application/json" },
-        Body = HttpService:JSONEncode(payload)
-    })
-
-    print("Webhook status:", res and res.StatusCode, "body:", res and res.Body)
-end
-]]
-
 -- Discord limits
 local MAX_FIELDS_PER_EMBED = 25
 local MAX_EMBEDS_PER_MESSAGE = 10
@@ -1780,6 +1870,8 @@ local reported = {}   -- reported[plot][key] = true
 local scanQueued = {} -- scanQueued[plot] = true
 local plotConns = {} -- plotConns[plot] = RBXScriptConnection
 
+
+--// Modified scanPlot to update Gist
 local function scanPlot(plot)
     if not plot or not plot.Parent then return end
     reported[plot] = reported[plot] or {}
@@ -1804,17 +1896,29 @@ local function scanPlot(plot)
                     local baseIncome = incomeByName[cleanName] or 0
 
                     local finalIncome, traitList = computeIncome(baseIncome, mutation, trait)
-
-                    if finalIncome >= MIN_INCOME then
-                        -- ✅ PING CONDITION (either special name OR income >= PING_MIN)
-                        if finalIncome >= PING_MIN or PING_NAMES[cleanName] then
+if finalIncome >= MIN_INCOME then
+    local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
+    local mutationText = mutation or "None"
+    -- Check if this should trigger ping (high-value)
+    local shouldPing = finalIncome >= PING_MIN or PING_NAMES[cleanName]
+    
+                        if shouldPing then
                             globalShouldPing = true
+                            
+                            -- 🔹 Only add to Gist if it's ping-worthy
+                            table.insert(currentGistData.brainrots, {
+                                name = displayName,
+                                rarity = rarity,
+                                mutation = mutationText,
+                                traits = traitText,
+                                income = finalIncome,
+                                cost = cost,
+                                serverId = game.JobId,  -- Needed for cleanup
+                                foundAt = os.time()     -- Needed for cleanup
+                            })
                         end
 
-                        local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
-                        local mutationText = mutation or "None"
-
-                        local label = ("**%s** | **%s** | 🧬 **%s** | 💰 **$%s** | 🌀 **%s**")
+                        local label = ("**%s** | **%s** | 🧬 **%s** | 💰 **$%s** | 🌀 **%s**" )
                             :format(displayName, rarity, mutationText, short(cost), traitText)
 
                         table.insert(foundList, {
@@ -1833,6 +1937,7 @@ local function scanPlot(plot)
             table.insert(globalFound, line)
         end
         queueWebhookSend()
+        queueGistUpdate() -- 🔹 Update Gist when brainrots found
         print("found in plot:", plot.Name, "count:", #foundList)
     end
 end
@@ -1881,5 +1986,51 @@ plotsFolder.ChildRemoved:Connect(function(plot)
     if plotConns[plot] then
         plotConns[plot]:Disconnect()
         plotConns[plot] = nil
+    end
+end)
+
+-- 🔹 Initial Gist update
+task.delay(2, function()
+    updateGist()
+end)
+
+-- 🔹 Periodic Gist updates (keep it fresh)
+task.spawn(function()
+    while true do
+        task.wait(10) -- Update every 30 seconds
+        if #currentGistData.brainrots > 0 then
+            updateGist()
+        end
+    end
+end)
+
+-- 🔹 Clean up old entries (ADD THIS NEW SECTION)
+task.spawn(function()
+    while true do
+        task.wait(60) -- Check every 1 minute
+        
+        local now = os.time()
+        local cleaned = {}
+        local seen = {}
+        
+        for _, brainrot in ipairs(currentGistData.brainrots) do
+            local age = now - brainrot.foundAt
+            
+            if age < 300 then -- Keep if less than 5 minutes old
+                local key = brainrot.serverId .. "|" .. brainrot.name .. "|" .. brainrot.mutation
+                
+                if not seen[key] then
+                    seen[key] = true
+                    table.insert(cleaned, brainrot)
+                end
+            end
+        end
+        
+        local removed = #currentGistData.brainrots - #cleaned
+        if removed > 0 then
+            currentGistData.brainrots = cleaned
+            updateGist()
+            print("[Gist] Cleaned", removed, "old entries. Active:", #cleaned)
+        end
     end
 end)
