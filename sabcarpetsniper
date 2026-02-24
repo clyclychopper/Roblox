@@ -2,7 +2,6 @@ getgenv().AutoBuyerEnabled = getgenv().AutoBuyerEnabled or false
 
 -- TARGET BRAINROTS
 getgenv().targetNames = getgenv().targetNames or {
-    "Girafa Celestre",
     "Meowl",
     "Skibidi Toilet",
     "Strawberry Elephant",
@@ -28,8 +27,7 @@ getgenv().targetNames = getgenv().targetNames or {
     "Burguro And Fryuro",
     "Capitano Moby",
     "Cerberus",
-    "Dragon Cannelloni",
-    "Noobini Pizzanini"
+    "Dragon Cannelloni"
 }
 
 -- ══════════════════════════════════════════════
