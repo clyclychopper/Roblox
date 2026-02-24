@@ -33,7 +33,7 @@ end
 
 --// HELPERS
 local function matchesTarget(objectText)
-    for _, name in ipairs(targetNames) do
+    for _, name in ipairs(getgenv().targetNames) do
         if objectText:lower():find(name:lower(), 1, true) then
             return true, name
         end
@@ -167,6 +167,6 @@ task.spawn(function()
 end)
 
 print("Watching for", #targetNames, "targets:")
-for _, name in ipairs(targetNames) do
+for _, name in ipairs(getgenv.().targetNames) do
     print(" -", name)
 end
