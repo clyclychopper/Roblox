@@ -1,18 +1,75 @@
 --// SETTINGS
 local plotsFolder = workspace:WaitForChild("Plots")
-
-local Content = "@everyone"
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local Content = ""
 
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1475066199342583848/tSwVV5wvoobDvA2cd0ZBJH3bELIEIxvFYswZ_mmVNLwzLgt9xo_k0fF-JT_P9dfw4GXz" -- <<<< change this
 
 local MIN_INCOME = 10000000
-local SEND_DELAY = 2       -- seconds to batch into 1 webhook
-local SCAN_DELAY = 1.0     -- seconds to wait after DescendantAdded (lets attributes/valueobjects load)
+local SEND_DELAY = 3     -- seconds to batch into 1 webhook
+local SCAN_DELAY = 1.5     -- seconds to wait after DescendantAdded (lets attributes/valueobjects load)
+
+-- PING
+local PING_MIN = 300000000 -- 300m threshold for ping (change if you want)
+local PING_NAMES = {
+    ["Rosetti Tualetti"] = true,
+    ["Rosey and Teddy"] = true,
+    ["Los Amigos"] = true,
+    ["Smurf Cat"] = true,
+    ["John Pork"] = true,
+    ["Dragon Cannelloni"] = true,
+    ["Meowl"] = true,
+    ["Strawberry Elephant"] = true,
+    ["Fragrama and Chocrama"] = true,
+    ["Ketupat Kepat"] = true,
+    ["Tang Tang Kelentang"] = true,
+    ["La Secret Combinasion"] = true,
+    ["Los Bros"] = true,
+    ["Los Hotspotsitos"] = true,
+    ["Spaghetti Tualetti"] = true,
+    ["Tralaledon"] = true,
+    ["Ketchuru and Masturu"] = true,
+    ["Garama and Madundung"] = true,
+    ["Nuclearo Dinosauro"] = true,
+    ["Los Tacoritas"] = true,
+    ["Tictac Sahur"] = true,
+    ["La Supreme Combinasion"] = true,
+    ["Los Combinasionas"] = true,
+    ["La Casa Boo"] = true,
+    ["Los Spooky Combinasionas"] = true,
+    ["Reinito Sleighito"] = true,
+    ["Sammyni Fattini"] = true,
+    ["Ketupat Bros"] = true,
+    ["Burguro And Fryuro"] = true,
+    ["Lavadorito Spinito"] = true,
+    ["Hydra Dragon Cannelloni"] = true,
+    ["Dragon Gingerini"] = true,
+    ["Spooky and Pumpky"] = true,
+    ["Cerberus"] = true,
+    ["Popcuru and Fizzuru"] = true,
+    ["Swaggy Bros"] = true,
+    ["Orcaledon"] = true,
+    ["Eviledon"] = true,
+    ["Cooki and Milki"] = true,
+    ["Capitano Moby"] = true,
+    ["Headless Horseman"] = true,
+    ["Noo my Heart"] = true
+
+}
+
+local globalShouldPing = false
 
 --// YOUR DATA (KEEP YOUR BIG TABLES HERE)
 -- Paste your big brainrots list here
 local brainrots = {
 -- God
+"Swaggy Bros",
+"Sammyni Fattini",
+"La Food Combinasion",
+"Los Sekolahs",
+"Smurf Cat",
+"John Pork",
 "Tim Cheese",
 "Fizzy Soda",
 "Cocofanto Elefanto",
@@ -95,6 +152,7 @@ local brainrots = {
 "Karkerheart Luvkur",
 
 -- SECRET BRAINROTS
+"La Taco Combinasion",
 "La Vacca Saturno Saturnita",
 "Pandanini Frostini",
 "Bisonte Giuppitere",
@@ -182,7 +240,6 @@ local brainrots = {
 "Los Chicleteiras",
 "67",
 "Donkeyturbo Express",
-"Donkeyturbo Express",
 "Mariachi Corazoni",
 "Los Burritos",
 "Los 25",
@@ -216,7 +273,7 @@ local brainrots = {
 "Los Puggies",
 "W or L",
 "Tralalalaledon",
-"La Extinct Grande Combinasion",
+"La Extinct Grande",
 "Tralaledon",
 "La Jolly Grande",
 "Los Primos",
@@ -246,7 +303,7 @@ local brainrots = {
 "La Secret Combinasion",
 "Reinito Sleighito",
 "Ketupat Bros",
-"Burguro and Fryuro",
+"Burguro And Fryuro",
 "Cooki and Milki",
 "Capitano Moby",
 "Rosey and Teddy",
@@ -267,7 +324,30 @@ local brainrots = {
 
 }
 
+local RARITY_COLOR = {
+    ["God"] = 0xFFD166,
+    ["Secret"] = 0xEF476F,
+    ["OG"] = 0x118AB2,
+    ["Burat"] = 0x06D6A0,
+    ["Unknown"] = 0x9E9E9E
+}
+
+local RARITY_ORDER = {
+    ["OG"] = 5,
+    ["Secret"] = 4,
+    ["God"] = 3,
+    ["Burat"] = 2,
+    ["Unknown"] = 1
+}
+
 local rarityByName = {
+
+    ["Swaggy Bros"] = "Secret",
+    ["Los Amigos"] = "Secret",
+    ["Sammyni Fattini"] = "Secret",
+    ["Los Sekolahs"] = "Secret",
+    ["La Food Combinasion"] = "Secret",
+    
 
     --GOD
     ["Tim Cheese"] = "Burat",
@@ -352,6 +432,7 @@ local rarityByName = {
     ["Karkerheart Luvkur"] = "God",
 
     --SECRET
+    ["La Taco Combinasion"] = "Secret",
     ["La Vacca Saturno Saturnita"] = "Secret",
     ["Pandanini Frostini"] = "Secret",
     ["Bisonte Giuppitere"] = "Secret",
@@ -472,7 +553,7 @@ local rarityByName = {
     ["Los Puggies"] = "Secret",
     ["W or L"] = "Secret",
     ["Tralalalaledon"] = "Secret",
-    ["La Extinct Grande Combinasion"] = "Secret",
+    ["La Extinct Grande"] = "Secret",
     ["Tralaledon"] = "Secret",
     ["La Jolly Grande"] = "Secret",
     ["Los Primos"] = "Secret",
@@ -502,7 +583,7 @@ local rarityByName = {
     ["La Secret Combinasion"] = "Secret",
     ["Reinito Sleighito"] = "Secret",
     ["Ketupat Bros"] = "Secret",
-    ["Burguro and Fryuro"] = "Secret",
+    ["Burguro And Fryuro"] = "Secret",
     ["Cooki and Milki"] = "Secret",
     ["Capitano Moby"] = "Secret",
     ["Rosey and Teddy"] = "Secret",
@@ -521,6 +602,16 @@ local rarityByName = {
 }
 
 local costByName = {
+
+    ["Swaggy Bros"] = 7000000000,
+    ["Los Amigos"] = 55000000000,
+    ["Sammyni Fattini"] = 20000000000,
+    ["La Food Combinasion"] = 30000000,
+    ["Los Sekolahs"] = 45000000000,
+    --og
+    ["Smurf Cat"] = 999999999999,
+    ["John Pork"] = 999999999999,
+
     
     --GOD
     ["Tim Cheese"] = 500,
@@ -535,6 +626,7 @@ local costByName = {
     ["Tralalero Tralala"] = 10000000,
     ["Los Crocodillitos"] = 12500000,
     ["Tigroligre Frutonni"] = 15000000,
+    ["Boatito Auratito"] = 525000,
     ["Odin Din Din Dun"] = 15000000,
     ["Orcalero Orcala"] = 15000000,
     ["Money Money Man"] = 17500000,
@@ -606,6 +698,7 @@ local costByName = {
 
     --SECRET
 
+    ["La Taco Combinasion"] = 5000000000,
     ["La Vacca Saturno Saturnita"] = 50000000,
     ["Pandanini Frostini"] = 64000000,
     ["Bisonte Giuppitere"] = 75000000,
@@ -776,7 +869,7 @@ local costByName = {
     ["W or L"] = 3000000000,
     ["Tralalalaledon"] = 3000000000,
 
-    ["La Extinct Grande Combinasion"] = 3200000000,
+    ["La Extinct Grande"] = 3200000000,
 
     ["Tralaledon"] = 3500000000,
     ["La Jolly Grande"] = 3500000000,
@@ -827,7 +920,7 @@ local costByName = {
 
     ["Ketupat Bros"] = 65000000000,
 
-    ["Burguro and Fryuro"] = 75000000000,
+    ["Burguro And Fryuro"] = 75000000000,
 
     ["Cooki and Milki"] = 100000000000,
 
@@ -850,6 +943,14 @@ local costByName = {
 }
 
 local incomeByName = {
+    ["Swaggy Bros"] = 40000000,
+    ["Los Amigos"] = 130000000,
+    ["Sammyni Fattini"] = 70000000,
+    ["John Pork"] = 999999999999999,
+    ["Smurf Cat"] = 999999999999999,
+
+    ["La Food Combinasion"] = 90000000,
+    ["Los Sekolahs"] = 110000000,
     --GOD
     ["Tim Cheese"] = 20,
     ["Fizzy Soda"] = 17200,
@@ -933,6 +1034,7 @@ local incomeByName = {
     ["Karkerheart Luvkur"] = 297500,
 
     --SECRET
+    ["La Taco Combinasion"] = 35000000,
     ["La Vacca Saturno Saturnita"] = 300000,
     ["Pandanini Frostini"] = 294000,
     ["Bisonte Giuppitere"] = 300000,
@@ -954,7 +1056,7 @@ local incomeByName = {
     ["Los Trios"] = 700000,
     ["Karker Sahur"] = 725000,
     ["Torrtuginni Dragonfrutini"] = 350000,
-    ["Los Tralaleritos"] = 750000,
+    ["Los Tralaleritos"] = 500000,
     ["Zombie Tralala"] = 500000,
     ["La Cucaracha"] = 475000,
     ["Vulturino Skeletono"] = 500000,
@@ -1003,7 +1105,7 @@ local incomeByName = {
     ["Chicleteira Bicicleteira"] = 3500000,
     ["Cupid Hotspot"] = 3500000,
     ["Spaghetti Tualetti"] = 6000000,
-    ["Esok Sekolah"] = 3000000,
+    ["Esok Sekolah"] = 30000000,
     ["Quesadillo Vampiro"] = 3500000,
     ["Brunito Marsito"] = 3500000,
     ["Chill Puppy"] = 4000000,
@@ -1053,7 +1155,7 @@ local incomeByName = {
     ["Los Puggies"] = 30000000,
     ["W or L"] = 30000000,
     ["Tralalalaledon"] = 37500000,
-    ["La Extinct Grande Combinasion"] = 23500000,
+    ["La Extinct Grande"] = 23500000,
     ["Tralaledon"] = 27500000,
     ["La Jolly Grande"] = 30000000,
     ["Los Primos"] = 31000000,
@@ -1083,7 +1185,7 @@ local incomeByName = {
     ["La Secret Combinasion"] = 125000000,
     ["Reinito Sleighito"] = 140000000,
     ["Ketupat Bros"] = 145000000,
-    ["Burguro and Fryuro"] = 150000000,
+    ["Burguro And Fryuro"] = 150000000,
     ["Cooki and Milki"] = 155000000,
     ["Capitano Moby"] = 160000000,
     ["Rosey and Teddy"] = 165000000,
@@ -1102,7 +1204,7 @@ local incomeByName = {
 
 -- Your multipliers/tables
 local mutationMultipliers = {
-    ["Default"] = 1,
+    ["None"] = 1,
     ["Gold"] = 1.25,
     ["Diamond"] = 1.5,
     ["Bloodrot"] = 2,
@@ -1122,6 +1224,7 @@ local traits = {
     ["Strawberry"] = 8,
     ["Meowl"] = 7,
     ["Skibidi"] = 6.5,
+    [":3"] = 1.5,
 
     -- Seasonal Event Traits
     ["Reindeer"] = 6,
@@ -1177,6 +1280,9 @@ local traitAliases = {
     ["ICON Meowl"] = "Meowl",
     ["SkibidiIcon"] = "Skibidi",
     ["Strawberry Strawberry"] = "Strawberry",
+    [":3"] = ":3",
+    [" :3"] = ":3",
+    [":3 "] = ":3",
 
     -- Seasonal
     ["SantaHatIcon"] = "Santa Hat",
@@ -1208,7 +1314,7 @@ local traitAliases = {
     ["Claws"] = "CrabClaw", -- your webhook shows this
     ["EvilTungTungSahur"] = "Tung Tung Attack",
     ["Zombie"] = "Tung Tung Attack",
-
+    ["Reindeer Pet"] = "Reindeer",
     -- Natural
     ["Cometstruck"] = "Comet-struck",
     ["CometstruckComet-struck"] = "Comet-struck",
@@ -1219,7 +1325,38 @@ local traitAliases = {
     ["SleepySleepy"] = "Sleepy",
 }
 
+
+
 --// HELPERS
+local function clampStr(s, maxLen)
+    s = tostring(s or "")
+    if #s > maxLen then
+        return s:sub(1, maxLen - 3) .. "..."
+    end
+    return s
+end
+
+local function short(n)
+    n = tonumber(n) or 0
+
+    local abs = math.abs(n)
+    local suffixes = {
+        {1e12, "T"},
+        {1e9, "B"},
+        {1e6, "M"},
+        {1e3, "K"}
+    }
+
+    for _, s in ipairs(suffixes) do
+        local value, suffix = s[1], s[2]
+        if abs >= value then
+            local num = n / value
+            return string.format("%.2f", num):gsub("%.00$", "") .. suffix
+        end
+    end
+
+    return tostring(n)
+end
 
 local function normalizeMutation(m)
     m = tostring(m or "Default")
@@ -1244,10 +1381,14 @@ end
 
 local function normalizeBrainrotName(raw)
     raw = tostring(raw or "")
-    raw = raw:gsub("%b[]", "") -- remove [..]
-    raw = raw:gsub("%b()", "") -- remove (..)
-    raw = raw:gsub("^%s+", ""):gsub("%s+$", "") -- trim
+    raw = raw:gsub("%b[]", "")
+    raw = raw:gsub("%b()", "")
+    raw = raw:gsub("^%s+", ""):gsub("%s+$", "")
     return raw
+end
+
+local function normalizeKey(raw)
+    return normalizeBrainrotName(raw):lower()
 end
 
 local function comma(n)
@@ -1273,6 +1414,7 @@ local function parseTraits(traitString)
 
     return result
 end
+
 
 -- ✅ BEST: Attribute -> ValueObject -> Descendants -> Name tags
 local function getMutation(obj)
@@ -1325,51 +1467,85 @@ local function getTrait(obj)
     return nil
 end
 
--- put this near your other tables
--- traits = {...}
--- traitAliases = {...}
-
 local function computeIncome(baseIncome, mutation, traitString)
     local base = tonumber(baseIncome) or 0
 
     mutation = normalizeMutation(mutation)
     local mMult = mutationMultipliers[mutation] or 1
 
-    local traitList = parseTraits(traitString)
+    local rawTraits = parseTraits(traitString)
 
-    -- If no traits, income is just base * mutation
-    if #traitList == 0 then
-        return math.floor(base * mMult), traitList
-    end
+    local mults = {}
+    local displayTraits = {}
+    local seen = {}
 
-    -- If traits exist, DO NOT include base as +1x
-    local sumTraitMult = 0
+    for _, rawTrait in ipairs(rawTraits) do
+        local tName = traitAliases[rawTrait] or rawTrait  -- ✅ map for BOTH calc + display
 
-    for _, rawTrait in ipairs(traitList) do
-        local tName = traitAliases and (traitAliases[rawTrait] or rawTrait) or rawTrait
+        -- for calculation
         local tMult = traits[tName]
-
         if tMult then
-            sumTraitMult = sumTraitMult + tMult
+            table.insert(mults, tMult)
         else
-            -- optional debug (helps fix "Claws" naming etc.)
-             warn("Unknown trait:", rawTrait, "mapped:", tName)
+            warn("[Brainrot] Unknown trait:", rawTrait, "mapped:", tName)
+        end
+
+        -- for webhook display (dedupe)
+        if not seen[tName] then
+            seen[tName] = true
+            table.insert(displayTraits, tName)
         end
     end
 
-    if sumTraitMult <= 0 then 
-        sumTraitMult = 1         
+    -- include mutation only if it actually does something
+    if mMult > 1 then
+        table.insert(mults, mMult)
     end
 
-    local total = base * sumTraitMult * mMult
-    return math.floor(total), traitList
+    if #mults == 0 then
+        return base, displayTraits
+    end
+
+    table.sort(mults, function(a,b) return a > b end)
+
+    local sum = mults[1]
+    for i = 2, #mults do
+        local reduced = mults[i] - 1
+        if reduced > 0 then
+            sum += reduced
+        end
+    end
+
+    return math.floor(base * sum), displayTraits
 end
 
 --// LOOKUP SET (normalized)
 local brainrotSet = {}
 for _, n in ipairs(brainrots) do
-    brainrotSet[normalizeBrainrotName(n)] = true
+    brainrotSet[normalizeKey(n)] = true
 end
+
+local function normKey(s)
+    return normalizeKey(s)
+end
+
+local function normalizeMap(map)
+    local out = {}
+    for k, v in pairs(map) do
+        out[normKey(k)] = v
+    end
+    return out
+end
+
+rarityByName = normalizeMap(rarityByName)
+costByName   = normalizeMap(costByName)
+incomeByName = normalizeMap(incomeByName)
+
+local newPing = {}
+for name,_ in pairs(PING_NAMES) do
+    newPing[normKey(name)] = true
+end
+PING_NAMES = newPing
 
 --// WEBHOOK
 local HttpService = game:GetService("HttpService")
@@ -1381,6 +1557,7 @@ local function getRequest()
         or request
 end
 
+--[[ SENDWEBHOOK ONCE TEMPLATE
 local function sendWebhookOnce(lines)
     if type(lines) ~= "table" or #lines == 0 then
         return
@@ -1392,27 +1569,38 @@ local function sendWebhookOnce(lines)
         return
     end
 
-    local list = table.concat(lines, "\n")
+    local list = table.concat(lines, "\n\n")
     if #list > 3900 then
-        list = list:sub(1, 3900) .. "\n..."
+        list = list:sub(1, 3900) .. "\n\n..."
     end
 
     local t = os.date("!*t")
     local timestamp = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.min, t.sec)
 
+    local playerCount = #game:GetService("Players"):GetPlayers()
+
     local embed = {
         title = "Brainrot Here My Nigga",
         url = "https://www.roblox.com/games/start?placeId=109983668079237&gameInstanceId="..game.JobId,
         description = list,
-        color = 99999,
-        footer = { text = game.JobId },
+        color = 0x00ffcc,
+        author = {
+        name = "Cly Notifier",
+        icon_url = "https://imgs.crazygames.com/steal-brainrot-online_1x1/20251117095739/steal-brainrot-online_1x1-cover?format=auto&quality=100&metadata=none&width=1200"
+    },
+        footer = { text = player.Name },
         fields = {
-            { name = "JobId", value = "```" .. game.JobId .. "```", inline = false }
+            { name = "JobId", value = "```" .. game.JobId .. "```", inline = false },
+            { name = "Players In Server", value = tostring(playerCount).."/8👤", inline = true }
         },
         timestamp = timestamp
     }
 
-    local payload = { content = Content, embeds = { embed } }
+    local payload = {
+    content = Content,
+    embeds = { embed },
+    allowed_mentions = (Content ~= "" and { parse = {"everyone"} } or { parse = {} })
+    }
 
     local res = req({
         Url = WEBHOOK_URL,
@@ -1423,10 +1611,150 @@ local function sendWebhookOnce(lines)
 
     print("Webhook status:", res and res.StatusCode, "body:", res and res.Body)
 end
+]]
+
+-- Discord limits
+local MAX_FIELDS_PER_EMBED = 25
+local MAX_EMBEDS_PER_MESSAGE = 10
+
+local function chunkArray(arr, chunkSize)
+    local out = {}
+    for i = 1, #arr, chunkSize do
+        local chunk = {}
+        for j = i, math.min(i + chunkSize - 1, #arr) do
+            table.insert(chunk, arr[j])
+        end
+        table.insert(out, chunk)
+    end
+    return out
+end
+
+local function sendWebhookPayload(req, payload)
+    local res = req({
+        Url = WEBHOOK_URL,
+        Method = "POST",
+        Headers = { ["Content-Type"] = "application/json" },
+        Body = HttpService:JSONEncode(payload)
+    })
+    print("Webhook status:", res and res.StatusCode, "body:", res and res.Body)
+    return res
+end
+
+local function sendWebhookGrouped(entries)
+    if type(entries) ~= "table" or #entries == 0 then return end
+
+    local req = getRequest()
+    if not req then
+        warn("Webhook: no request function found")
+        return
+    end
+
+    -- group by rarity
+    local groups = {}
+    for _, e in ipairs(entries) do
+        local r = e.rarity or "Unknown"
+        groups[r] = groups[r] or {}
+        table.insert(groups[r], e)
+    end
+
+    -- order rarities (define somewhere above!)
+    -- RARITY_ORDER = { Secret=4, God=3, Burat=2, OG=1, Unknown=0 }
+    local rarities = {}
+    for r,_ in pairs(groups) do table.insert(rarities, r) end
+    table.sort(rarities, function(a,b)
+        return (RARITY_ORDER[a] or 0) > (RARITY_ORDER[b] or 0)
+    end)
+
+    local t = os.date("!*t")
+    local timestamp = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.min, t.sec)
+    local playerCount = #game:GetService("Players"):GetPlayers()
+
+    -- Build ALL embeds first, then send them in chunks of 10 embeds per webhook
+    local allEmbeds = {}
+
+    for _, rarity in ipairs(rarities) do
+        local bucket = groups[rarity]
+
+        -- sort inside rarity by income desc
+        table.sort(bucket, function(a,b)
+            return (a.income or 0) > (b.income or 0)
+        end)
+
+        -- brainrot fields (1 field per brainrot)
+        local brainrotFields = {}
+        for _, e in ipairs(bucket) do
+            local fname = ("💵 %s/s"):format(short(e.income))
+            local fval  = e.line
+
+            table.insert(brainrotFields, {
+                name = clampStr(fname, 256),
+                value = clampStr(fval, 1024),
+                inline = false
+            })
+        end
+        -- chunk brainrots into embeds (25 fields max), BUT we also want JobId + Players fields
+        -- so reserve 2 fields for those => only 23 brainrot fields per embed
+        local PER_EMBED_BRAINROT_FIELDS = MAX_FIELDS_PER_EMBED - 2
+        local fieldChunks = chunkArray(brainrotFields, PER_EMBED_BRAINROT_FIELDS)
+
+        for idx, fchunk in ipairs(fieldChunks) do
+            -- append the copy-friendly fields at the bottom of EACH embed
+            table.insert(fchunk, {
+                name = "Server ID",
+                value = "```" .. game.JobId .. "```",
+                inline = false
+            })
+
+            table.insert(allEmbeds, {
+                title = (#fieldChunks > 1)
+                    and ("Found Brainrots — %s (%d/%d)"):format(rarity, idx, #fieldChunks)
+                    or  ("Found Brainrots — %s"):format(rarity),
+
+                url = "https://www.roblox.com/games/start?placeId=109983668079237&gameInstanceId="..game.JobId,
+
+                description = "",
+
+                color = RARITY_COLOR[rarity] or RARITY_COLOR["Unknown"],
+
+                thumbnail = {url = "https://static.wikia.nocookie.net/stealabr/images/e/e3/Tung_Tung_Tung_Sahur.png/revision/latest?cb=20260125163843"},
+
+                footer = {text = player.Name .. " | " .. tostring(playerCount) .. "/8👤"},
+
+                fields = fchunk,
+
+                timestamp = timestamp
+            })
+        end
+    end
+
+    -- ✅ Multi-send: split embeds into batches of 10 embeds per webhook message
+    local embedBatches = chunkArray(allEmbeds, MAX_EMBEDS_PER_MESSAGE)
+
+    for i, embedBatch in ipairs(embedBatches) do
+        -- only ping on the FIRST message (so you don't spam @everyone multiple times)
+        local contentForThis = (i == 1) and Content or ""
+
+        local payload = {
+            content = contentForThis,
+            username = "Cly Notify",
+            avatar_url = "https://assets.teenvogue.com/photos/5d4daf13b068cf00080a03f7/16:9/w_2560%2Cc_limit/00-story-diddy.jpg",
+            embeds = embedBatch,
+            allowed_mentions = (contentForThis ~= "" and { parse = {"everyone"} } or { parse = {} })
+        }
+
+        sendWebhookPayload(req, payload)
+
+        -- small delay so Discord doesn't rate limit you as hard
+        if i < #embedBatches then
+            task.wait(0.35)
+        end
+    end
+end
 
 -- batch sending
 local globalFound = {}
 local webhookQueued = false
+
 
 local function queueWebhookSend()
     if webhookQueued then return end
@@ -1436,14 +1764,21 @@ local function queueWebhookSend()
         webhookQueued = false
         if #globalFound == 0 then return end
 
-        sendWebhookOnce(globalFound)
+        -- ✅ set ping content here (only once per batch)
+        Content = globalShouldPing and "@everyone" or ""
+
+        sendWebhookGrouped(globalFound)
+
         table.clear(globalFound)
+        globalShouldPing = false
+        Content = "" -- reset
     end)
 end
 
 --// SCANNING (per plot)
 local reported = {}   -- reported[plot][key] = true
 local scanQueued = {} -- scanQueued[plot] = true
+local plotConns = {} -- plotConns[plot] = RBXScriptConnection
 
 local function scanPlot(plot)
     if not plot or not plot.Parent then return end
@@ -1451,12 +1786,10 @@ local function scanPlot(plot)
 
     local foundList = {}
 
-    -- NOTE: you said brainrots are inside workspace.Plots.<plotname>.<brainrotModel>
-    -- so scanning plot:GetDescendants() is correct.
     for _, obj in ipairs(plot:GetDescendants()) do
-        -- ✅ prefer Model scan (less duplicates)
         if obj:IsA("Model") then
-            local cleanName = normalizeBrainrotName(obj.Name)
+            local displayName = normalizeBrainrotName(obj.Name)
+            local cleanName = normalizeKey(displayName)
 
             if brainrotSet[cleanName] then
                 local mutation = getMutation(obj)
@@ -1473,13 +1806,22 @@ local function scanPlot(plot)
                     local finalIncome, traitList = computeIncome(baseIncome, mutation, trait)
 
                     if finalIncome >= MIN_INCOME then
+                        -- ✅ PING CONDITION (either special name OR income >= PING_MIN)
+                        if finalIncome >= PING_MIN or PING_NAMES[cleanName] then
+                            globalShouldPing = true
+                        end
+
                         local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
-                        local mutationText = mutation or "Default"
+                        local mutationText = mutation or "None"
 
-                        local label = ("**%s** | **%s** | **✨ %s** | 💰 $%s | 🎭 **%s** | 💵 **$%s/s**")
-                            :format(cleanName, rarity, mutationText, comma(cost), traitText, comma(finalIncome))
+                        local label = ("**%s** | **%s** | 🧬 **%s** | 💰 **$%s** | 🌀 **%s**")
+                            :format(displayName, rarity, mutationText, short(cost), traitText)
 
-                        table.insert(foundList, label)
+                        table.insert(foundList, {
+                            rarity = rarity,
+                            income = finalIncome,
+                            line = label
+                        })
                     end
                 end
             end
@@ -1496,15 +1838,26 @@ local function scanPlot(plot)
 end
 
 local function hookPlot(plot)
+
+    -- 🔹 disconnect old connection if this plot was already hooked
+    if plotConns[plot] then
+        plotConns[plot]:Disconnect()
+        plotConns[plot] = nil
+    end
+
+    -- 🔹 initial scan
     scanPlot(plot)
 
-    plot.DescendantAdded:Connect(function()
+    -- 🔹 connect listener
+    plotConns[plot] = plot.DescendantAdded:Connect(function()
         if scanQueued[plot] then return end
         scanQueued[plot] = true
 
         task.delay(SCAN_DELAY, function()
             scanQueued[plot] = nil
-            scanPlot(plot)
+            if plot and plot.Parent then
+                scanPlot(plot)
+            end
         end)
     end)
 end
@@ -1524,4 +1877,9 @@ end)
 plotsFolder.ChildRemoved:Connect(function(plot)
     reported[plot] = nil
     scanQueued[plot] = nil
+
+    if plotConns[plot] then
+        plotConns[plot]:Disconnect()
+        plotConns[plot] = nil
+    end
 end)
