@@ -191,6 +191,7 @@ local isBusy = false
 
 local renderedFolder = workspace:WaitForChild("RenderedMovingAnimals")
 local recentlyFired = {}
+local foundTargets = false
 
 -- ANTI AFK
 spawn(function()
@@ -258,6 +259,15 @@ local function findClosestPrompt()
 
     local closestPrompt, closestPart, closestDist, closestMatchedName = nil, nil, math.huge, nil
     local targetNames = getgenv().targetNames or {}
+    
+    -- DEBUG: Print what targets we're looking for
+    if not foundTargets then
+        print("[AutoBuyer] TARGET NAMES LOADED:")
+        for i, name in ipairs(targetNames) do
+            print(string.format("  %d. %s", i, name))
+        end
+        foundTargets = true
+    end
 
     -- Search in WORKSPACE (not renderedFolder) for all prompts
     for _, obj in ipairs(workspace:GetDescendants()) do
@@ -362,6 +372,7 @@ local function findAndFire()
         humanoid:MoveTo(getPromptPart(closestPromptToMe).Position)
 
         if currentDist <= FIRE_DISTANCE then
+            print(string.format("[AutoBuyer] Within firing distance! Dist: %.2f, waiting...", currentDist))
             task.wait(0.15)
             
             -- Refind the closest prompt in case it changed
@@ -383,15 +394,17 @@ local function findAndFire()
                 end
             end
 
+            print(string.format("[AutoBuyer] Final check - Found prompt: %s, Dist: %.2f, FIRE_DISTANCE: %d", finalPrompt ~= nil, finalDist, FIRE_DISTANCE))
+            
             if finalPrompt and finalPrompt.Parent and finalDist <= FIRE_DISTANCE then
-                print("[AutoBuyer] Firing prompt for: " .. lockedName)
+                print("[AutoBuyer] ✓ FIRING PROMPT for: " .. lockedName)
                 fireproximityprompt(finalPrompt)
                 lastFired = tick()
                 recentlyFired[finalPrompt] = tick()
                 fired = true
                 print("[AutoBuyer] Successfully fired! Cooldown started for: " .. lockedName)
             else
-                print(string.format("[AutoBuyer] Too far after wait: %.2f, retrying...", finalDist))
+                print(string.format("[AutoBuyer] ✗ NOT FIRING - Too far: %.2f > %d", finalDist, FIRE_DISTANCE))
             end
             break
         end
