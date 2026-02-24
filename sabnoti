@@ -4,11 +4,10 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local Content = ""
 
-local WEBHOOK_URL = "https://discord.com/api/webhooks/1475066199342583848/tSwVV5wvoobDvA2cd0ZBJH3bELIEIxvFYswZ_mmVNLwzLgt9xo_k0fF-JT_P9dfw4GXz"
-
+local WEBHOOK_URL = getgenv().Webhook or error("❌ Webhook not set! Set getgenv().Webhook first")
 -- 🔹 GitHub Gist Settings
-local GITHUB_TOKEN = "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" -- Your GitHub Personal Access Token
-local GIST_ID = "3aadaf473d91f8461122c772fb0e03e2" -- Paste this ID -- Your Gist ID (leave empty to create new)
+local GITHUB_TOKEN = getgenv().GithubToken or error("❌ GitHub token not set! Set getgenv().GithubToken first")
+local GIST_ID = getgenv().GistID or ""
 local GIST_FILENAME = "brainrot_server.json"
 local UPDATE_GIST = true -- Set to false to disable Gist updates
 
