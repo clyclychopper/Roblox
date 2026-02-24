@@ -5,18 +5,14 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Remove old GUI if it exists (ensures only 1 active GUI)
-pcall(function()
-    if playerGui:FindFirstChild("AutoBuyerGUI") then
-        playerGui.AutoBuyerGUI:Destroy()
-    end
-end)
+-- Remove old GUI if reinjecting
+if playerGui:FindFirstChild("AutoBuyerGUI") then
+    playerGui.AutoBuyerGUI:Destroy()
+end
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoBuyerGUI"
@@ -27,7 +23,7 @@ screenGui.Parent = playerGui
 -- Main frame (pill shape)
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 280, 0, 56)
+mainFrame.Size = UDim2.new(0, 220, 0, 56)
 mainFrame.Position = UDim2.new(0, 16, 0, 16)
 mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
 mainFrame.BorderSizePixel = 0
@@ -60,7 +56,7 @@ dotCorner.Parent = dot
 
 -- Label
 local label = Instance.new("TextLabel")
-label.Size = UDim2.new(1, -180, 1, 0)
+label.Size = UDim2.new(1, -100, 1, 0)
 label.Position = UDim2.new(0, 36, 0, 0)
 label.BackgroundTransparency = 1
 label.Text = "Brainrot Sniper -Cly"
@@ -73,7 +69,7 @@ label.Parent = mainFrame
 -- Status text (ON/OFF)
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(0, 36, 1, 0)
-statusLabel.Position = UDim2.new(1, -156, 0, 0)
+statusLabel.Position = UDim2.new(1, -96, 0, 0)
 statusLabel.BackgroundTransparency = 1
 statusLabel.Text = "OFF"
 statusLabel.Font = Enum.Font.GothamBold
@@ -85,7 +81,7 @@ statusLabel.Parent = mainFrame
 -- Toggle switch background
 local toggleBg = Instance.new("Frame")
 toggleBg.Size = UDim2.new(0, 46, 0, 26)
-toggleBg.Position = UDim2.new(1, -122, 0.5, -13)
+toggleBg.Position = UDim2.new(1, -62, 0.5, -13)
 toggleBg.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 toggleBg.BorderSizePixel = 0
 toggleBg.Parent = mainFrame
@@ -118,28 +114,6 @@ shine.Parent = knob
 local shineCorner = Instance.new("UICorner")
 shineCorner.CornerRadius = UDim.new(1, 0)
 shineCorner.Parent = shine
-
--- Server Hop Button
-local hopButton = Instance.new("TextButton")
-hopButton.Size = UDim2.new(0, 55, 0, 26)
-hopButton.Position = UDim2.new(1, -68, 0.5, -13)
-hopButton.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-hopButton.BorderSizePixel = 0
-hopButton.Text = "HOP"
-hopButton.Font = Enum.Font.GothamBold
-hopButton.TextSize = 11
-hopButton.TextColor3 = Color3.fromRGB(150, 150, 200)
-hopButton.Parent = mainFrame
-
-local hopButtonCorner = Instance.new("UICorner")
-hopButtonCorner.CornerRadius = UDim.new(0, 8)
-hopButtonCorner.Parent = hopButton
-
-local hopButtonStroke = Instance.new("UIStroke")
-hopButtonStroke.Color = Color3.fromRGB(150, 150, 200)
-hopButtonStroke.Thickness = 1
-hopButtonStroke.Transparency = 0.3
-hopButtonStroke.Parent = hopButton
 
 -- ═══════════════ TOGGLE LOGIC ═══════════════
 
@@ -191,40 +165,6 @@ toggleBg.InputBegan:Connect(function(input)
     end
 end)
 
--- Server Hop Function
-local function serverHop()
-    print("[AutoBuyer] Attempting to hop servers...")
-    hopButton.Text = "..."
-    hopButton.TextColor3 = Color3.fromRGB(255, 200, 100)
-    
-    pcall(function()
-        local placeId = game.PlaceId
-        local servers = HttpService:JSONDecode(game:HttpGet(
-            "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
-        ))
-        
-        if servers and servers.data and #servers.data > 0 then
-            local randomServer = servers.data[math.random(1, #servers.data)]
-            if randomServer.id then
-                print("[AutoBuyer] Hopping to server: " .. randomServer.id)
-                TeleportService:TeleportToPlaceInstance(placeId, randomServer.id, player)
-            else
-                print("[AutoBuyer] Failed to get server ID")
-                hopButton.Text = "HOP"
-                hopButton.TextColor3 = Color3.fromRGB(150, 150, 200)
-            end
-        else
-            print("[AutoBuyer] No servers found")
-            hopButton.Text = "HOP"
-            hopButton.TextColor3 = Color3.fromRGB(150, 150, 200)
-        end
-    end)
-end
-
-hopButton.MouseButton1Click:Connect(function()
-    serverHop()
-end)
-
 -- Click anywhere on frame also works
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -233,7 +173,7 @@ mainFrame.InputBegan:Connect(function(input)
 end)
 
 -- Set initial visuals
-updateVisuals(getgenv().AutoBuyerEnabled or false)
+updateVisuals(getgenv().AutoBuyerEnabled)
 
 -- ══════════════════════════════════════════════
 --               AUTOBUYER LOGIC
@@ -432,4 +372,3 @@ task.spawn(function()
 end)
 
 print("[AutoBuyer] Loaded! Use the toggle button to enable.")
-print("[AutoBuyer] Click HOP button to server hop.")
