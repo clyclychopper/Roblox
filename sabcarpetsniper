@@ -184,9 +184,9 @@ local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
 
-local FIRE_DISTANCE = 5
+local FIRE_DISTANCE = 4
 local DEBOUNCE = 3
-local REFIRE_COOLDOWN = 20
+local REFIRE_COOLDOWN = 5
 local lastFired = 0
 local isBusy = false
 
