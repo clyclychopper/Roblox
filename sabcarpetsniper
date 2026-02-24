@@ -257,12 +257,22 @@ local function findClosestPrompt()
     cleanRecentlyFired()
 
     local closestPrompt, closestPart, closestDist, closestMatchedName = nil, nil, math.huge, nil
+    local targetNames = getgenv().targetNames or {}
 
     -- Search in WORKSPACE (not renderedFolder) for all prompts
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("ProximityPrompt") and obj.ActionText == "Purchase" then
             -- Extract the animal name (remove the price part like "$25K")
             local promptName = obj.ObjectText:match("^([^$]+)"):gsub("%s+$", "")  -- Remove trailing whitespace and price
+            
+            -- Check if this animal is in our target list
+            local isTarget = false
+            for _, targetName in ipairs(targetNames) do
+                if promptName:lower():find(targetName:lower(), 1, true) then
+                    isTarget = true
+                    break
+                end
+            end
             
             -- Check if this animal is currently rendered
             local isRendered = false
@@ -273,7 +283,7 @@ local function findClosestPrompt()
                 end
             end
             
-            if isRendered and not recentlyFired[obj] then
+            if isTarget and isRendered and not recentlyFired[obj] then
                 local part = getPromptPart(obj)
                 if part then
                     local dist = (rootPart.Position - part.Position).Magnitude
