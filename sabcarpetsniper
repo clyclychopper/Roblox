@@ -6,7 +6,7 @@ local humanoid = character:WaitForChild("Humanoid")
 
 local FIRE_DISTANCE = 5
 local DEBOUNCE = 3
-local REFIRE_COOLDOWN = 8
+local REFIRE_COOLDOWN = 12
 local lastFired = 0
 local isBusy = false
 
