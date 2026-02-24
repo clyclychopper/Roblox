@@ -45,6 +45,7 @@ local function cleanRecentlyFired()
     local now = tick()
     for prompt, firedAt in pairs(recentlyFired) do
         if now - firedAt > REFIRE_COOLDOWN then
+            print("[AutoBuyer] Cleared cooldown for prompt:", prompt)
             recentlyFired[prompt] = nil
         end
     end
@@ -98,23 +99,45 @@ local function findClosestPrompt()
                             closestMatchedName = matchedName
                         end
                     end
+                else
+                    print("[AutoBuyer] Skipping prompt (on cooldown):", obj.ObjectText)
                 end
             end
         end
+    end
+
+    if closestPrompt then
+        print(string.format("[AutoBuyer] Found target: '%s' | Dist: %.2f", closestMatchedName, closestDist))
+    else
+        print("[AutoBuyer] No valid targets found.")
     end
 
     return closestPrompt, closestPart, closestDist, closestMatchedName
 end
 
 local function findAndFire()
-    if isBusy then return end
+    if isBusy then
+        print("[AutoBuyer] Busy, skipping cycle.")
+        return
+    end
     local now = tick()
-    if now - lastFired < DEBOUNCE then return end
+    if now - lastFired < DEBOUNCE then
+        print(string.format("[AutoBuyer] Debounce active. %.2fs remaining.", DEBOUNCE - (now - lastFired)))
+        return
+    end
 
     local prompt, part, dist, matchedName = findClosestPrompt()
-    if not prompt or not part then return end
+    if not prompt or not part then
+        print("[AutoBuyer] Nothing to do this cycle.")
+        return
+    end
 
     isBusy = true
+    print(string.format("[AutoBuyer] Locking onto: '%s' | Starting dist: %.2f", matchedName, dist))
+
+    -- FIX: Mark as recently fired IMMEDIATELY when we lock on, not after firing
+    -- This prevents re-selecting the same target if isBusy resets mid-loop
+    recentlyFired[prompt] = tick()
 
     local lockedPrompt = prompt
     local lockedPart = part
@@ -124,14 +147,19 @@ local function findAndFire()
 
     while tick() < timeout do
         if not lockedPrompt or not lockedPrompt.Parent or not lockedPart or not lockedPart.Parent then
+            print("[AutoBuyer] Locked prompt/part destroyed, aborting.")
             break
         end
 
         if not isAnimalRendered(lockedName) then
+            print("[AutoBuyer] Animal '" .. lockedName .. "' no longer rendered, aborting.")
+            -- FIX: Remove from recentlyFired so it can be retried if it reappears
+            recentlyFired[lockedPrompt] = nil
             break
         end
 
         local currentDist = (rootPart.Position - lockedPart.Position).Magnitude
+        print(string.format("[AutoBuyer] Moving to '%s' | Dist: %.2f", lockedName, currentDist))
         humanoid:MoveTo(lockedPart.Position)
 
         if currentDist <= FIRE_DISTANCE then
@@ -139,10 +167,15 @@ local function findAndFire()
             if lockedPrompt and lockedPrompt.Parent then
                 local finalDist = (rootPart.Position - lockedPart.Position).Magnitude
                 if finalDist <= FIRE_DISTANCE then
+                    print("[AutoBuyer] Firing prompt for: " .. lockedName)
                     fireproximityprompt(lockedPrompt)
                     lastFired = tick()
+                    -- Update the fired time (was pre-set above, now confirm with real fire time)
                     recentlyFired[lockedPrompt] = tick()
                     fired = true
+                    print("[AutoBuyer] Successfully fired! Cooldown started for: " .. lockedName)
+                else
+                    print(string.format("[AutoBuyer] Too far after wait: %.2f, retrying...", finalDist))
                 end
             end
             break
@@ -151,7 +184,12 @@ local function findAndFire()
         task.wait(0.1)
     end
 
+    if not fired then
+        print("[AutoBuyer] Did not fire for: " .. lockedName .. " (timeout or aborted)")
+    end
+
     isBusy = false
+    print("[AutoBuyer] Cycle complete. isBusy reset.")
 end
 
 player.CharacterAdded:Connect(function(char)
@@ -161,6 +199,7 @@ player.CharacterAdded:Connect(function(char)
     isBusy = false
     lastFired = 0
     recentlyFired = {}
+    print("[AutoBuyer] Character respawned, state reset.")
 end)
 
 task.spawn(function()
