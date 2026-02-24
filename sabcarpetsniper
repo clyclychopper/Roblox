@@ -43,7 +43,7 @@ stroke.Parent = mainFrame
 
 local dot = Instance.new("Frame")
 dot.Size = UDim2.new(0, 10, 0, 10)
-dot.Position = UDim2.new(0, 18, 0, 18)
+dot.Position = UDim2.new(0, 18, 0.5, -5)
 dot.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 dot.BorderSizePixel = 0
 dot.Parent = mainFrame
@@ -53,7 +53,7 @@ dotCorner.CornerRadius = UDim.new(1, 0)
 dotCorner.Parent = dot
 
 local label = Instance.new("TextLabel")
-label.Size = UDim2.new(1, -100, 0, 56)
+label.Size = UDim2.new(1, -100, 1, 0)
 label.Position = UDim2.new(0, 36, 0, 0)
 label.BackgroundTransparency = 1
 label.Text = "Brainrot Sniper -Cly"
@@ -64,7 +64,7 @@ label.TextXAlignment = Enum.TextXAlignment.Left
 label.Parent = mainFrame
 
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(0, 36, 0, 56)
+statusLabel.Size = UDim2.new(0, 36, 1, 0)
 statusLabel.Position = UDim2.new(1, -96, 0, 0)
 statusLabel.BackgroundTransparency = 1
 statusLabel.Text = "OFF"
@@ -76,7 +76,7 @@ statusLabel.Parent = mainFrame
 
 local toggleBg = Instance.new("Frame")
 toggleBg.Size = UDim2.new(0, 46, 0, 26)
-toggleBg.Position = UDim2.new(1, -62, 0, 15)
+toggleBg.Position = UDim2.new(1, -62, 0.5, -13)
 toggleBg.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 toggleBg.BorderSizePixel = 0
 toggleBg.Parent = mainFrame
