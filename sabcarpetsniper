@@ -4,12 +4,6 @@ local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
 
---// SETTINGS
-local targetNames = {
-    "Noobini Pizzanini",
-    "Trippi Troppi",
-    "Tim Cheese",
-}
 
 local FIRE_DISTANCE = 5
 local DEBOUNCE = 3
