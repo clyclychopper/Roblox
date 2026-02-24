@@ -221,7 +221,7 @@ local function serverHop()
             if #servers == 0 then
                 hopButton.Text = "No Servers"
                 hopButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-                task.wait(2)
+                wait(2)
                 hopButton.Text = "Server Hop"
                 hopButton.BackgroundColor3 = Color3.fromRGB(50, 130, 200)
                 return
@@ -239,7 +239,7 @@ local function serverHop()
             warn("[ServerHop] Error:", result)
             hopButton.Text = "Failed"
             hopButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-            task.wait(2)
+            wait(2)
             hopButton.Text = "Server Hop"
             hopButton.BackgroundColor3 = Color3.fromRGB(50, 130, 200)
         end
