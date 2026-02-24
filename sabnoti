@@ -1876,6 +1876,8 @@ local function scanPlot(plot)
                                     serverId = game.JobId,
                                     foundAt = os.time()
                                 })
+                                -- ✅ Update Gist immediately when ping-worthy item found
+                                queueGistUpdate()
                             end
                         end
 
@@ -1898,7 +1900,7 @@ local function scanPlot(plot)
             table.insert(globalFound, line)
         end
         queueWebhookSend()
-        queueGistUpdate()
+        -- ✅ Gist update moved inside shouldPing check above
         print("[Scanner] Found", #foundList, "brainrots in plot:", plot.Name)
     end
 end
@@ -1943,16 +1945,11 @@ plotsFolder.ChildRemoved:Connect(function(plot)
     end
 end)
 
+-- ✅ Initial Gist load only (no periodic updates, only on ping)
 task.delay(2, function()
-    updateGist()
-end)
-
-task.spawn(function()
-    while true do
-        task.wait(30)
-        if #currentGistData.brainrots > 0 then
-            updateGist()
-        end
+    if #currentGistData.brainrots > 0 then
+        print("[Gist] Initial update with loaded entries...")
+        updateGist()
     end
 end)
 
