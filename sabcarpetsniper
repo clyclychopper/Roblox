@@ -1,22 +1,67 @@
 local Players = game:GetService("Players")
-local VirtualUser = game:GetService("VirtualUser")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
 
--- ANTI AFK (Universal Mobile Fallback)
-task.spawn(function()
-    while true do
-        task.wait(60)
-        -- Simulate camera movement to reset idle
-        local cam = workspace.CurrentCamera
-        local cf = cam.CFrame
-        cam.CFrame = cf * CFrame.Angles(0, math.rad(1), 0)
-        task.wait(0.1)
-        cam.CFrame = cf
+local FIRE_DISTANCE = 5
+local DEBOUNCE = 3
+local REFIRE_COOLDOWN = 8
+local lastFired = 0
+local isBusy = false
+
+local renderedFolder = workspace:WaitForChild("RenderedMovingAnimals")
+local recentlyFired = {}
+
+-- ANTI AFK (Delta Mobile + PC Compatible)
+-- ANTI AFK (PC + Delta Mobile Compatible)
+local antiAfkRunning = true
+
+spawn(function()
+    while antiAfkRunning do
+        wait(60)
+        -- Method 1: player move (works on mobile/delta)
+        pcall(function()
+            player:Move(Vector3.new(0, 0, 0), true)
+        end)
+        -- Method 2: camera nudge (works on PC)
+        pcall(function()
+            local cam = workspace.CurrentCamera
+            local cf = cam.CFrame
+            cam.CFrame = cf * CFrame.Angles(0, math.rad(0.001), 0)
+            wait(0.1)
+            cam.CFrame = cf
+        end)
     end
 end)
+
+-- Backup: fires when Roblox detects idle
+player.Idled:Connect(function()
+    pcall(function()
+        player:Move(Vector3.new(0, 0, 0), true)
+    end)
+    pcall(function()
+        local cam = workspace.CurrentCamera
+        local cf = cam.CFrame
+        cam.CFrame = cf * CFrame.Angles(0, math.rad(0.001), 0)
+        wait(0.1)
+        cam.CFrame = cf
+    end)
+end)
+
+-- Also use idled event as backup
+player.Idled:Connect(function()
+    player:Move(Vector3.new(0, 0, 0), true)
+end)
+
+local function cleanRecentlyFired()
+    local now = tick()
+    for prompt, firedAt in pairs(recentlyFired) do
+        if now - firedAt > REFIRE_COOLDOWN then
+            recentlyFired[prompt] = nil
+        end
+    end
+end
 
 local function matchesTarget(objectText)
     for _, name in ipairs(getgenv().targetNames) do
@@ -150,7 +195,6 @@ task.spawn(function()
     end
 end)
 
--- Fixed typo: getgenv.() -> getgenv()
 print("Watching for", #getgenv().targetNames, "targets:")
 for _, name in ipairs(getgenv().targetNames) do
     print(" -", name)
