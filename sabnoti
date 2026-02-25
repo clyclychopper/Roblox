@@ -1650,7 +1650,7 @@ local function sendWebhookGrouped(entries)
         for i, embedBatch in ipairs(embedBatches) do
             local payload = {
                 content = (i == 1 and shouldPing) and "@everyone" or "",
-                username = "Cly Notify [" .. webhookName .. "]",
+                username = "Cly Notify",
                 avatar_url = "https://assets.teenvogue.com/photos/5d4daf13b068cf00080a03f7/16:9/w_2560%2Cc_limit/00-story-diddy.jpg",
                 embeds = embedBatch,
                 allowed_mentions = (i == 1 and shouldPing) and { parse = {"everyone"} } or { parse = {} }
