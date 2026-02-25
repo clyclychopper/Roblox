@@ -185,18 +185,68 @@ local HIGH_THRESHOLD = 500000000  -- 500m
 local SEND_DELAY = 3
 local SCAN_DELAY = 1.5
 
-local HOP_TIMERS = {
-    NONE = 600,      -- 10 minutes (no brainrots)
-    LOW = 300,       -- 5 minutes (5m-50m)
-    MID = 180,        -- 1 minute (50m-500m)
-    HIGH = 3         -- 3 seconds (500m+ or ping names)
+local MAX_PLAYERS = 8
+local HOP_INTERVAL = 60  -- 1 minute
+local HIGH_VALUE_THRESHOLD = 300000000  -- 300m
+
+-- Bot usernames to avoid (will hop if detected)
+local BOT_USERNAMES = {
+    ["Nor4crewHQgames11"] = true,
+    ["LadyLucasrbxDev"] = true,
+    ["miniRileyliamProJax"] = true,
+    ["Calebcrafts77"] = true,
+    ["TurboSirZo3crafts521"] = true,
+    ["BravezagedinoRBLX13"] = true,
+    ["RubyClanYTDash51"] = true,
+    ["SneakyCalebnat1on200"] = true,
+    ["Ggigaraven"] = true,
+    ["g4mingFuzzyM0oseKid"] = true,
+    ["TurbomaxdragonPro80"] = true,
+    ["AriharperYT"] = true,
+    ["plGold3nDolphinPlayz"] = true,
+    ["P1xelchloe41"] = true,
+    ["ChloecodezRBX"] = true,
+    ["EpicZanedrawsGaming3"] = true,
+    ["Goldenkoala63"] = true,
+    ["l3ozquaad"] = true,
+    ["k4ydengamestv256"] = true,
+    ["LunaCreates52"] = true,
+    ["SilentsharkPlayz"] = true,
+    ["L3osk4teschill2015"] = true,
+    ["Ultr4skymiaPlays"] = true,
+    ["rubyrbxnationPro22"] = true,
+    ["HarperdrawsDevcrafts"] = true,
+    ["re4lAriagamesPlayz"] = true,
+    ["Rubystreams56"] = true,
+    ["IsabellaSStudioPlayz"] = true,
+    ["Turbop3nguin75"] = true,
+    ["Sirh4z3lcraftsrblx28"] = true,
+    ["capta1nRileykoala"] = true,
+    ["itsKayd3nBloxFam"] = true,
+    ["TheFuzzypenguingirlr"] = true,
+    ["Ol1viaDraws82"] = true,
+    ["RealNoranaationPlayz"] = true,
+    ["kaiisabellaGaming853"] = true,
+    ["MiabloxRBX60"] = true,
+    ["LilHazelztreams"] = true,
+    ["Embercrafts48"] = true,
+    ["Officialnoahskat3s97"] = true,
+    ["Mil0editsRaven"] = true,
+    ["MrsgoldenravenboyBlo"] = true,
+    ["finnJackzonytPixel"] = true,
+    ["r3CrimsonPenguinBlox"] = true,
+    ["SageSquadbunny30"] = true,
+    ["finngrayzonn40"] = true,
+    ["EthanNationrapid12"] = true,
+    ["Emberreditzquantum"] = true,
+    ["Ch1lldolphingirlRBLX"] = true,
+    ["EthaanplayzDev58"] = true,
+    ["NoahrbxcluubDev"] = true,
+    ["l1amplayzgames61"] = true,
+    ["AriclanVib3s"] = true,
 }
 
-local MAX_PLAYERS = 8
-
 local currentHopTimer = nil
-local hopStartTime = 0
-local currentTimerDuration = HOP_TIMERS.NONE
 
 local PING_NAMES = {
     ["Rosetti Tualetti"] = true,
@@ -1631,262 +1681,21 @@ PING_NAMES = newPing
 --// WEBHOOK ONLY MODE (Gist handled by Master Bot)
 local globalShouldPing = false
 
+-- Forward declarations
 local scanPlot
 local serverHop
 local checkServerFull
+local sendWebhookGrouped
+local queueWebhookSend
 
---// SERVER HOP SYSTEM
-local currentHopTimer = nil
-local hopStartTime = tick()
-local currentTimerDuration = HOP_TIMERS.NONE
-
-
---// SERVER HOP SYSTEM
-local function getTimeRemaining()
-    if not currentHopTimer or not currentTimerDuration then 
-        return HOP_TIMERS.NONE
-    end
-    local elapsed = tick() - hopStartTime
-    return math.max(0, currentTimerDuration - elapsed)
-end
-
-local function updateHopTimer(newDuration, reason)
-    local remaining = getTimeRemaining()
-    
-    if not remaining or not newDuration then
-        warn("[HOP] ⚠️ Invalid timer values")
-        return
-    end
-    
-    if newDuration < remaining then
-        if currentHopTimer then
-            task.cancel(currentHopTimer)
-        end
-        
-        currentTimerDuration = newDuration
-        hopStartTime = tick()
-        
-        print(string.format(
-            "[HOP] ⏰ Timer: %.1f min → %.1f min | %s",
-            remaining / 60, newDuration / 60, reason
-        ))
-        
-        currentHopTimer = task.delay(newDuration, function()
-            print("[HOP] ⏰ Timer expired!")
-            serverHop()
-        end)
-    else
-        print(string.format(
-            "[HOP] ⏸️ Timer kept: %.1f min | %s",
-            remaining / 60, reason
-        ))
-    end
-end
-
-function serverHop()
-    print("\n🔄 [HOP] Initiating server hop...")
-    print("[HOP] Ensuring all plots are scanned...")
-    
-    for _, plot in ipairs(plotsFolder:GetChildren()) do
-        if plot and plot.Parent then
-            pcall(function() scanPlot(plot) end)
-        end
-    end
-    
-    task.wait(2)
-    
-    local success, errorMsg = pcall(function()
-        local placeId = game.PlaceId
-        local servers = {}
-        
-        print("[HOP] Fetching server list...")
-        local cursor = ""
-        local attempts = 0
-        
-        repeat
-            attempts += 1
-            if attempts > 3 then break end
-            
-            local url = string.format(
-                "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100&cursor=%s",
-                placeId, cursor
-            )
-            
-            local response = game:HttpGet(url)
-            local data = HttpService:JSONDecode(response)
-            
-            for _, server in ipairs(data.data) do
-                if server.id ~= game.JobId and server.playing < server.maxPlayers then
-                    table.insert(servers, server.id)
-                end
-            end
-            
-            cursor = data.nextPageCursor or ""
-        until cursor == ""
-        
-        if #servers > 0 then
-            local randomServer = servers[math.random(1, #servers)]
-            print(string.format("[HOP] Found %d servers. Teleporting...", #servers))
-            TeleportService:TeleportToPlaceInstance(placeId, randomServer, player)
-        else
-            warn("[HOP] No servers found, rejoining...")
-            TeleportService:Teleport(placeId, player)
-        end
-    end)
-    
-    if not success then
-        warn("[HOP] Failed:", errorMsg)
-        TeleportService:Teleport(game.PlaceId, player)
-    end
-
-     -- ✅ ADD THIS: Restart timer after hop attempt
-    task.wait(2)
-    if not currentHopTimer or getTimeRemaining() < 60 then
-        print("[HOP] 🔄 Restarting default timer after hop")
-        currentTimerDuration = HOP_TIMERS.NONE
-        hopStartTime = tick()
-        currentHopTimer = task.delay(HOP_TIMERS.NONE, function()
-            print("[HOP] ⏰ Timer expired")
-            serverHop()
-        end)
-    end
-
-
-end
-
-function checkServerFull()
-    local playerCount = #Players:GetPlayers()
-    if playerCount >= MAX_PLAYERS then
-        print(string.format("[HOP] ⚠️ Server full (%d/%d players)", playerCount, MAX_PLAYERS))
-        updateHopTimer(HOP_TIMERS.MID, "Server full")
-        return true
-    end
-    return false
-end
-
--- Start initial timer
-task.wait(0.1)
-currentHopTimer = task.delay(HOP_TIMERS.NONE, function()
-    print("[HOP] ⏰ Initial timer expired")
-    serverHop()
-end)
-
-print(string.format("[HOP] ✅ Started: %.1f minutes", HOP_TIMERS.NONE / 60))
-
--- Status monitor
-task.spawn(function()
-    while true do
-        task.wait(30)
-        local remaining = getTimeRemaining()
-        local playerCount = #Players:GetPlayers()
-        print(string.format(
-            "[HOP] 📊 Time: %.1f min | Players: %d/%d",
-            remaining / 60, playerCount, MAX_PLAYERS
-        ))
-    end
-end)
-
--- Monitor player count
-Players.PlayerAdded:Connect(function()
-    task.wait(1)
-    checkServerFull()
-end)
-
---// SCANNING
+--// WEBHOOK FUNCTIONS
+local MAX_FIELDS_PER_EMBED = 25
+local MAX_EMBEDS_PER_MESSAGE = 10
 local reported = {}
 local scanQueued = {}
 local plotConns = {}
 local globalFound = {}
 local webhookTimer = nil
-
-function scanPlot(plot)
-    if not plot or not plot.Parent then return end
-    reported[plot] = reported[plot] or {}
-
-    local foundList = {}
-    local shouldHopImmediate = false
-
-    for _, obj in ipairs(plot:GetDescendants()) do
-        if obj:IsA("Model") then
-            local displayName = normalizeBrainrotName(obj.Name)
-            local cleanName = normalizeKey(displayName)
-
-            if brainrotSet[cleanName] then
-                local mutation = getMutation(obj)
-                local trait = getTrait(obj)
-
-                local key = cleanName .. "|" .. (mutation or "None") .. "|" .. (trait or "None")
-                if not reported[plot][key] then
-                    reported[plot][key] = true
-
-                    local rarity = rarityByName[cleanName] or "Unknown"
-                    local cost = costByName[cleanName] or 0
-                    local baseIncome = incomeByName[cleanName] or 0
-
-                    local finalIncome, traitList = computeIncome(baseIncome, mutation, trait)
-                    
-                    if finalIncome >= MIN_INCOME then
-                        local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
-                        local mutationText = mutation or "None"
-                        local isPingName = PING_NAMES[cleanName] or false
-
-                        if isPingName or finalIncome >= HIGH_THRESHOLD then
-                            shouldHopImmediate = true
-                            print(string.format(
-                                "[HOP] 🚨 HIGH VALUE: %s (%.0fm/s) - Hopping ASAP!",
-                                displayName, finalIncome / 1000000
-                            ))
-                        elseif finalIncome >= PING_THRESHOLD then
-                            updateHopTimer(HOP_TIMERS.MID, string.format(
-                                "100m+ brainrot: %s", displayName
-                            ))
-                        elseif finalIncome >= WEBHOOK_4_MIN then
-                            updateHopTimer(HOP_TIMERS.LOW, string.format(
-                                "10m+ brainrot: %s", displayName
-                            ))
-                        end
-
-                        if isPingName then
-                            globalShouldPing = true
-                        end
-
-                        local label = ("**%s** | **%s** | 🧬 **%s** | 💰 **$%s** | 🌀 **%s**")
-                            :format(displayName, rarity, mutationText, short(cost), traitText)
-
-                        table.insert(foundList, {
-                            rarity = rarity,
-                            income = finalIncome,
-                            line = label,
-                            isPingName = isPingName
-                        })
-                    end
-                end
-            end
-        end
-    end
-
-    if #foundList > 0 then
-        for _, line in ipairs(foundList) do
-            table.insert(globalFound, line)
-        end
-        queueWebhookSend()
-        
-        print(string.format("[Scanner] ✅ Found %d brainrots in %s", #foundList, plot.Name))
-        
-        checkServerFull()
-        
-        if shouldHopImmediate then
-            print("[HOP] 🚀 Immediate hop in 3s...")
-            task.delay(HOP_TIMERS.HIGH, function()
-                serverHop()
-            end)
-        end
-    end
-end
-
---// WEBHOOK FUNCTIONS
-local MAX_FIELDS_PER_EMBED = 25
-local MAX_EMBEDS_PER_MESSAGE = 10
 
 local function chunkArray(arr, chunkSize)
     local out = {}
@@ -1900,7 +1709,7 @@ local function chunkArray(arr, chunkSize)
     return out
 end
 
-local function sendWebhookGrouped(entries)
+function sendWebhookGrouped(entries)
     if type(entries) ~= "table" or #entries == 0 then return end
     
     local req = getRequest()
@@ -2037,7 +1846,7 @@ local function sendWebhookGrouped(entries)
     buildAndSend(webhook4Entries, WEBHOOK_4, "WH4 (Main 10m+)", webhook4HasPingNames or webhook4Has300mPlus)
 end
 
-local function queueWebhookSend()
+function queueWebhookSend()
     if webhookTimer then
         task.cancel(webhookTimer)
     end
@@ -2052,6 +1861,190 @@ local function queueWebhookSend()
         table.clear(globalFound)
         globalShouldPing = false
     end)
+end
+
+--// SERVER HOP SYSTEM
+local function checkForBots()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and BOT_USERNAMES[p.Name] then
+            print(string.format("[HOP] 🤖 Bot detected: %s - Hopping immediately!", p.Name))
+            return true
+        end
+    end
+    return false
+end
+
+function serverHop(reason)
+    print(string.format("\n🔄 [HOP] Initiating server hop... Reason: %s", reason or "Timer"))
+    
+    -- Send any pending webhooks first
+    if #globalFound > 0 then
+        print("[HOP] Sending pending webhooks before hopping...")
+        sendWebhookGrouped(globalFound)
+        table.clear(globalFound)
+        task.wait(1)
+    end
+    
+    local success, errorMsg = pcall(function()
+        local placeId = game.PlaceId
+        local servers = {}
+        
+        print("[HOP] Fetching server list...")
+        local cursor = ""
+        local attempts = 0
+        
+        repeat
+            attempts += 1
+            if attempts > 3 then break end
+            
+            local url = string.format(
+                "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100&cursor=%s",
+                placeId, cursor
+            )
+            
+            local response = game:HttpGet(url)
+            local data = HttpService:JSONDecode(response)
+            
+            for _, server in ipairs(data.data) do
+                if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                    table.insert(servers, server.id)
+                end
+            end
+            
+            cursor = data.nextPageCursor or ""
+        until cursor == ""
+        
+        if #servers > 0 then
+            local randomServer = servers[math.random(1, #servers)]
+            print(string.format("[HOP] Found %d servers. Teleporting...", #servers))
+            TeleportService:TeleportToPlaceInstance(placeId, randomServer, player)
+        else
+            warn("[HOP] No servers found, rejoining...")
+            TeleportService:Teleport(placeId, player)
+        end
+    end)
+    
+    if not success then
+        warn("[HOP] Failed:", errorMsg)
+        TeleportService:Teleport(game.PlaceId, player)
+    end
+end
+
+function checkServerFull()
+    local playerCount = #Players:GetPlayers()
+    if playerCount >= MAX_PLAYERS then
+        print(string.format("[HOP] ⚠️ Server full (%d/%d players) - Hopping!", playerCount, MAX_PLAYERS))
+        serverHop("Server Full")
+        return true
+    end
+    return false
+end
+
+-- Start 1-minute hop timer
+local function startHopTimer()
+    if currentHopTimer then
+        task.cancel(currentHopTimer)
+    end
+    currentHopTimer = task.delay(HOP_INTERVAL, function()
+        print("[HOP] ⏰ 1-minute timer expired")
+        serverHop("Timer")
+    end)
+end
+
+task.wait(0.1)
+startHopTimer()
+print("[HOP] ✅ Started: 1-minute hop interval")
+
+-- Check for bots on startup
+if checkForBots() then
+    serverHop("Bot Detected")
+end
+
+-- Monitor for new players (bots)
+Players.PlayerAdded:Connect(function(newPlayer)
+    task.wait(0.5)
+    if BOT_USERNAMES[newPlayer.Name] then
+        print(string.format("[HOP] 🤖 Bot joined: %s - Hopping!", newPlayer.Name))
+        serverHop("Bot Joined")
+    end
+end)
+
+--// SCANNING
+function scanPlot(plot)
+    if not plot or not plot.Parent then return end
+    reported[plot] = reported[plot] or {}
+
+    local foundList = {}
+    local shouldHopImmediate = false
+
+    for _, obj in ipairs(plot:GetDescendants()) do
+        if obj:IsA("Model") then
+            local displayName = normalizeBrainrotName(obj.Name)
+            local cleanName = normalizeKey(displayName)
+
+            if brainrotSet[cleanName] then
+                local mutation = getMutation(obj)
+                local trait = getTrait(obj)
+
+                local key = cleanName .. "|" .. (mutation or "None") .. "|" .. (trait or "None")
+                if not reported[plot][key] then
+                    reported[plot][key] = true
+
+                    local rarity = rarityByName[cleanName] or "Unknown"
+                    local cost = costByName[cleanName] or 0
+                    local baseIncome = incomeByName[cleanName] or 0
+
+                    local finalIncome, traitList = computeIncome(baseIncome, mutation, trait)
+                    
+                    if finalIncome >= MIN_INCOME then
+                        local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
+                        local mutationText = mutation or "None"
+                        local isPingName = PING_NAMES[cleanName] or false
+
+                        if isPingName or finalIncome >= HIGH_VALUE_THRESHOLD then
+                            shouldHopImmediate = true
+                            print(string.format(
+                                "[HOP] 🚨 HIGH VALUE: %s (%.0fm/s) - Will hop after webhook!",
+                                displayName, finalIncome / 1000000
+                            ))
+                        end
+
+                        if isPingName then
+                            globalShouldPing = true
+                        end
+
+                        local label = ("**%s** | **%s** | 🧬 **%s** | 💰 **$%s** | 🌀 **%s**")
+                            :format(displayName, rarity, mutationText, short(cost), traitText)
+
+                        table.insert(foundList, {
+                            rarity = rarity,
+                            income = finalIncome,
+                            line = label,
+                            isPingName = isPingName
+                        })
+                    end
+                end
+            end
+        end
+    end
+
+    if #foundList > 0 then
+        for _, line in ipairs(foundList) do
+            table.insert(globalFound, line)
+        end
+        queueWebhookSend()
+        
+        print(string.format("[Scanner] ✅ Found %d brainrots in %s", #foundList, plot.Name))
+        
+        if shouldHopImmediate then
+            print("[HOP] 🚀 High value detected - hopping after webhook...")
+            task.delay(2, function()
+                serverHop("High Value Brainrot")
+            end)
+        elseif checkServerFull() then
+            -- Already hops inside checkServerFull
+        end
+    end
 end
 
 --// PLOT HOOKING & INITIALIZATION
@@ -2096,4 +2089,4 @@ plotsFolder.ChildRemoved:Connect(function(plot)
 end)
 
 print("[Scanner] ✅ Initialized!")
-print("[HOP] 📋 Rules: 10min default | 5min (10m+) | 3min (100m+/full) | ASAP (500m+/ping)")
+print("[HOP] 📋 Rules: 1min timer | Immediate on ping names/300m+ | Immediate on server full | Immediate on bot detection")
