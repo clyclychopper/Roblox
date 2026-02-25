@@ -86,7 +86,33 @@ do
         end
     end)
 
-    -- Workspace part deletion intentionally removed to preserve Baseplate and map geometry
+    -- Destroy non-essential workspace parts (NOT inside Plots folder)
+    pcall(function()
+        local ws = game:GetService("Workspace")
+        local plotsFolder = ws:FindFirstChild("Plots")
+        local camera = ws.CurrentCamera
+        local terrain = ws:FindFirstChildOfClass("Terrain")
+
+        local KEEP = {
+            [plotsFolder] = true,
+            [camera] = true,
+            [terrain] = true,
+        }
+
+        for _, child in ipairs(ws:GetChildren()) do
+            if not KEEP[child] then
+                -- Keep folders that might be needed
+                if child:IsA("Folder") and child.Name ~= "Plots" then
+                    -- safe to destroy non-plot folders
+                    pcall(function() child:Destroy() end)
+                elseif child:IsA("BasePart") or child:IsA("Model") or child:IsA("MeshPart") then
+                    pcall(function() child:Destroy() end)
+                elseif child:IsA("Sky") or child:IsA("Atmosphere") then
+                    pcall(function() child:Destroy() end)
+                end
+            end
+        end
+    end)
 
     -- Continuously suppress new particles/effects spawning in non-plot areas
     task.spawn(function()
@@ -1608,7 +1634,6 @@ local globalShouldPing = false
 local scanPlot
 local serverHop
 local checkServerFull
-local queueWebhookSend  -- forward declare so scanPlot can call it
 
 --// SERVER HOP SYSTEM
 local currentHopTimer = nil
@@ -1635,7 +1660,7 @@ local function updateHopTimer(newDuration, reason)
     
     if newDuration < remaining then
         if currentHopTimer then
-            currentHopTimer:Cancel()
+            task.cancel(currentHopTimer)
         end
         
         currentTimerDuration = newDuration
@@ -1713,6 +1738,20 @@ function serverHop()
         warn("[HOP] Failed:", errorMsg)
         TeleportService:Teleport(game.PlaceId, player)
     end
+
+     -- ✅ ADD THIS: Restart timer after hop attempt
+    task.wait(2)
+    if not currentHopTimer or getTimeRemaining() < 60 then
+        print("[HOP] 🔄 Restarting default timer after hop")
+        currentTimerDuration = HOP_TIMERS.NONE
+        hopStartTime = tick()
+        currentHopTimer = task.delay(HOP_TIMERS.NONE, function()
+            print("[HOP] ⏰ Timer expired")
+            serverHop()
+        end)
+    end
+
+
 end
 
 function checkServerFull()
@@ -1998,9 +2037,9 @@ local function sendWebhookGrouped(entries)
     buildAndSend(webhook4Entries, WEBHOOK_4, "WH4 (Main 10m+)", webhook4HasPingNames or webhook4Has300mPlus)
 end
 
-function queueWebhookSend()
+local function queueWebhookSend()
     if webhookTimer then
-        webhookTimer:Cancel()
+        task.cancel(webhookTimer)
     end
     
     webhookTimer = task.delay(SEND_DELAY, function()
