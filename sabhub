@@ -1,7 +1,5 @@
---// GIST VIEWER GUI v2
---// Reads brainrot data from GitHub Gist and displays grouped by server
---// Design: Terminal/Monitor aesthetic — neon cyan on deep slate
-
+--// BRAINROT VIEWER v3 — Compact Black Modern
+--// Sleek, dense, all info retained. No fluff.
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
@@ -12,82 +10,61 @@ local UserInputService = game:GetService("UserInputService")
 local GITHUB_TOKEN = getgenv().GithubToken or error("❌ Set getgenv().GithubToken first")
 local GIST_ID = getgenv().GistID or error("❌ Set getgenv().GistID first")
 local GIST_FILENAME = "brainrot_server.json"
-local REFRESH_INTERVAL = 0.5  -- Check every 0.5 seconds for instant sync
+local REFRESH_INTERVAL = 0.5
 local USE_MOCK_DATA = false
-local lastKnownTimestamp = 0  -- Track last update to avoid redundant UI refreshes
+local lastKnownTimestamp = 0
 
 -- ══════════════════════════════════════════
---  THEME — Grey Modern
+--  THEME — Pitch Black Modern
 -- ══════════════════════════════════════════
 local T = {
-    Bg          = Color3.fromRGB(15, 23, 42),
-    Panel       = Color3.fromRGB(30, 41, 59),
-    Card        = Color3.fromRGB(51, 65, 85),
-    CardHover   = Color3.fromRGB(71, 85, 105),
-    Border      = Color3.fromRGB(51, 65, 85),
-    Accent      = Color3.fromRGB(99, 102, 241),
-    AccentDim   = Color3.fromRGB(79, 70, 229),
-    AccentGlow  = Color3.fromRGB(129, 140, 248),
-    Green       = Color3.fromRGB(16, 185, 129),
-    Yellow      = Color3.fromRGB(245, 158, 11),
-    Orange      = Color3.fromRGB(249, 115, 22),
-    Red         = Color3.fromRGB(239, 68, 68),
-    Purple      = Color3.fromRGB(139, 92, 246),
-    Blue        = Color3.fromRGB(59, 130, 246),
-    Text        = Color3.fromRGB(248, 250, 252),
-    TextMid     = Color3.fromRGB(203, 213, 225),
-    TextDim     = Color3.fromRGB(148, 163, 184),
+    Bg          = Color3.fromRGB(8, 8, 8),
+    Panel       = Color3.fromRGB(14, 14, 14),
+    Card        = Color3.fromRGB(20, 20, 20),
+    CardHover   = Color3.fromRGB(26, 26, 26),
+    Border      = Color3.fromRGB(32, 32, 32),
+    BorderBright= Color3.fromRGB(48, 48, 48),
+    Accent      = Color3.fromRGB(255, 255, 255),
+    AccentDim   = Color3.fromRGB(180, 180, 180),
+    AccentSub   = Color3.fromRGB(100, 100, 100),
+    Green       = Color3.fromRGB(74, 222, 128),
+    GreenDim    = Color3.fromRGB(34, 120, 60),
+    Yellow      = Color3.fromRGB(250, 204, 21),
+    Orange      = Color3.fromRGB(251, 146, 60),
+    Red         = Color3.fromRGB(248, 113, 113),
+    Purple      = Color3.fromRGB(167, 139, 250),
+    Blue        = Color3.fromRGB(96, 165, 250),
+    Cyan        = Color3.fromRGB(34, 211, 238),
+    Text        = Color3.fromRGB(240, 240, 240),
+    TextMid     = Color3.fromRGB(160, 160, 160),
+    TextDim     = Color3.fromRGB(90, 90, 90),
+    Gold        = Color3.fromRGB(251, 191, 36),
     Transparent = Color3.fromRGB(0, 0, 0),
 }
 
 local RARITY = {
-    ["OG"]      = "rainbow",  -- special case for gradient
-    ["Secret"]  = Color3.fromRGB(255, 255, 255),
-    ["God"]     = Color3.fromRGB(239, 68, 68),
-    ["Burat"]   = Color3.fromRGB(34, 197, 94),
-    ["Unknown"] = Color3.fromRGB(148, 163, 184),
+    ["OG"]      = "rainbow",
+    ["Secret"]  = Color3.fromRGB(220, 220, 220),
+    ["God"]     = Color3.fromRGB(248, 113, 113),
+    ["Burat"]   = Color3.fromRGB(74, 222, 128),
+    ["Unknown"] = Color3.fromRGB(80, 80, 80),
 }
 
--- Priority brainrots to highlight
 local PING_NAMES = {
-    ["Rosetti Tualetti"] = true,
-    ["Rosey and Teddy"] = true,
-    ["Los Amigos"] = true,
-    ["Smurf Cat"] = true,
-    ["John Pork"] = true,
-    ["Dragon Cannelloni"] = true,
-    ["Meowl"] = true,
-    ["Strawberry Elephant"] = true,
-    ["Ketchuru and Masturu"] = true,
-    ["Ketupat Kepat"] = true,
-    ["Tang Tang Kelentang"] = true,
-    ["La Secret Combinasion"] = true,
-    ["Los Bros"] = true,
-    ["Los Hotspotsitos"] = true,
-    ["Spaghetti Tualetti"] = true,
-    ["Garama and Madundung"] = true,
-    ["Nuclearo Dinosauro"] = true,
-    ["Los Tacoritas"] = true,
-    ["Tictac Sahur"] = true,
-    ["La Supreme Combinasion"] = true,
-    ["Los Combinasionas"] = true,
-    ["La Casa Boo"] = true,
-    ["Los Spooky Combinasionas"] = true,
-    ["Reinito Sleighito"] = true,
-    ["Sammyni Fattini"] = true,
-    ["Ketupat Bros"] = true,
-    ["Burguro And Fryuro"] = true,
-    ["Lavadorito Spinito"] = true,
-    ["Hydra Dragon Cannelloni"] = true,
-    ["Dragon Gingerini"] = true,
-    ["Cerberus"] = true,
-    ["Capitano Moby"] = true,
-    ["Headless Horseman"] = true,
-    ["Spaghetti Tualetti"] = true,
-    
+    ["Rosetti Tualetti"]=true,["Rosey and Teddy"]=true,["Los Amigos"]=true,
+    ["Smurf Cat"]=true,["John Pork"]=true,["Dragon Cannelloni"]=true,
+    ["Meowl"]=true,["Strawberry Elephant"]=true,["Ketchuru and Masturu"]=true,
+    ["Ketupat Kepat"]=true,["Tang Tang Kelentang"]=true,["La Secret Combinasion"]=true,
+    ["Los Bros"]=true,["Los Hotspotsitos"]=true,["Spaghetti Tualetti"]=true,
+    ["Garama and Madundung"]=true,["Nuclearo Dinosauro"]=true,["Los Tacoritas"]=true,
+    ["Tictac Sahur"]=true,["La Supreme Combinasion"]=true,["Los Combinasionas"]=true,
+    ["La Casa Boo"]=true,["Los Spooky Combinasionas"]=true,["Reinito Sleighito"]=true,
+    ["Sammyni Fattini"]=true,["Ketupat Bros"]=true,["Burguro And Fryuro"]=true,
+    ["Lavadorito Spinito"]=true,["Hydra Dragon Cannelloni"]=true,["Dragon Gingerini"]=true,
+    ["Cerberus"]=true,["Capitano Moby"]=true,["Headless Horseman"]=true,
 }
 
-local HIGH_INCOME_THRESHOLD = 500000000  -- 500M/s
+local HIGH_INCOME_THRESHOLD = 500000000
 
 -- ══════════════════════════════════════════
 --  HELPERS
@@ -101,7 +78,7 @@ local function short(n)
     local abs = math.abs(n)
     for _, s in ipairs({{1e12,"T"},{1e9,"B"},{1e6,"M"},{1e3,"K"}}) do
         if abs >= s[1] then
-            return string.format("%.2f", n / s[1]):gsub("%.00$","") .. s[2]
+            return string.format("%.1f", n / s[1]):gsub("%.0$","") .. s[2]
         end
     end
     return tostring(n)
@@ -109,64 +86,70 @@ end
 
 local function timeAgo(ts)
     local d = os.time() - ts
-    -- Fix negative time bug
-    if d < 0 then return "just now" end
-    if d < 60 then return d.."s" elseif d < 3600 then return math.floor(d/60).."m"
-    elseif d < 86400 then return math.floor(d/3600).."h" else return math.floor(d/86400).."d" end
+    if d < 0 then return "now" end
+    if d < 60 then return d.."s"
+    elseif d < 3600 then return math.floor(d/60).."m"
+    elseif d < 86400 then return math.floor(d/3600).."h"
+    else return math.floor(d/86400).."d" end
 end
 
 local function getTimeColor(ts)
-    local d = os.time() - ts
-    local minutes = d / 60
-    if minutes >= 10 then
-        return T.Red
-    elseif minutes >= 5 then
-        return T.Orange
-    else
-        return T.TextDim
-    end
+    local d = (os.time() - ts) / 60
+    if d >= 10 then return T.Red
+    elseif d >= 5 then return T.Orange
+    else return T.TextDim end
 end
 
 -- ══════════════════════════════════════════
 --  UI HELPERS
 -- ══════════════════════════════════════════
-local function corner(parent, r)
+local function corner(p, r)
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(0, r or 4)
-    c.Parent = parent
+    c.Parent = p
+    return c
 end
 
-local function stroke(parent, color, thickness, transparency)
+local function stroke(p, color, thick, trans)
     local s = Instance.new("UIStroke")
     s.Color = color or T.Border
-    s.Thickness = thickness or 1
-    s.Transparency = transparency or 0
-    s.Parent = parent
+    s.Thickness = thick or 1
+    s.Transparency = trans or 0
+    s.Parent = p
+    return s
 end
 
-local function label(parent, props)
+local function lbl(parent, props)
     local l = Instance.new("TextLabel")
     l.BackgroundTransparency = 1
     l.TextXAlignment = props.align or Enum.TextXAlignment.Left
     l.Font = props.font or Enum.Font.Code
-    l.TextSize = props.size or 13
+    l.TextSize = props.size or 12
     l.TextColor3 = props.color or T.Text
     l.Text = props.text or ""
     l.Size = props.sz or UDim2.new(1,0,1,0)
     l.Position = props.pos or UDim2.new(0,0,0,0)
-    l.TextTruncate = props.truncate and Enum.TextTruncate.AtEnd or Enum.TextTruncate.None
+    l.TextTruncate = props.trunc and Enum.TextTruncate.AtEnd or Enum.TextTruncate.None
     l.Parent = parent
     return l
 end
 
-local function frame(parent, props)
+local function frm(parent, props)
     local f = Instance.new("Frame")
-    f.Size = props.sz or UDim2.new(1,0,0,40)
+    f.Size = props.sz or UDim2.new(1,0,0,32)
     f.Position = props.pos or UDim2.new(0,0,0,0)
     f.BackgroundColor3 = props.bg or T.Panel
     f.BorderSizePixel = 0
     f.Parent = parent
     return f
+end
+
+local function pill(parent, text, color, xOff, yOff, w)
+    local p = frm(parent, {sz=UDim2.new(0,w or 52,0,18), pos=UDim2.new(1,xOff,0,yOff), bg=T.Bg})
+    corner(p, 3)
+    stroke(p, color, 1, 0.4)
+    lbl(p, {text=text, size=10, color=color, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
+    return p
 end
 
 -- ══════════════════════════════════════════
@@ -175,13 +158,12 @@ end
 local function fetchGistData()
     if USE_MOCK_DATA then
         return {
-            jobId="master-bot", placeId=109983668079237,
-            timestamp=os.time(), playerCount=0,
+            jobId="mock-bot", placeId=109983668079237, timestamp=os.time(), playerCount=0,
             brainrots={
-                                {name="Chicleteira Noelteira",rarity="Secret",mutation="Lava",traits="Nyan, Fire",income=360000,cost=2000000000,serverId="server-abc123def456",foundAt=os.time()-120,playerCount=12},
-                {name="Dragon Cannelloni",rarity="Secret",mutation="Rainbow",traits="Lightning",income=500000000,cost=250000000000,serverId="server-xyz789ghi012",foundAt=os.time()-60,playerCount=8},
-                {name="Meowl",rarity="OG",mutation="Divine",traits="Meowl",income=800000000,cost=500000000000,serverId="server-abc123def456",foundAt=os.time()-30,playerCount=12},
-                {name="Ultra Rat",rarity="God",mutation="Cosmic",traits="Speed",income=1200000000,cost=999000000000,serverId="server-abc123def456",foundAt=os.time()-10,playerCount=12},
+                {name="Dragon Cannelloni",rarity="Secret",mutation="Rainbow",traits="Lightning",income=500000000,cost=250000000000,serverId="srv-abc123",foundAt=os.time()-60,playerCount=8},
+                {name="Meowl",rarity="OG",mutation="Divine",traits="Meowl",income=800000000,cost=500000000000,serverId="srv-abc123",foundAt=os.time()-30,playerCount=8},
+                {name="Ultra Rat",rarity="God",mutation="Cosmic",traits="Speed",income=120000000,cost=999000000000,serverId="srv-xyz789",foundAt=os.time()-10,playerCount=12},
+                {name="Smurf Cat",rarity="Burat",mutation="Frost",traits="Chill",income=45000000,cost=50000000000,serverId="srv-xyz789",foundAt=os.time()-200,playerCount=12},
             }
         }
     end
@@ -208,255 +190,173 @@ end
 --  BUILD GUI
 -- ══════════════════════════════════════════
 local function buildGUI()
-    local old = CoreGui:FindFirstChild("BrainrotViewerV2")
+    local old = CoreGui:FindFirstChild("BrainrotViewerV3")
     if old then old:Destroy() end
 
     local sg = Instance.new("ScreenGui")
-    sg.Name = "BrainrotViewerV2"
+    sg.Name = "BrainrotViewerV3"
     sg.ResetOnSpawn = false
     sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-    -- ── Main Window ──────────────────────────────
+    -- ── Main Window (compact: 560 × 460) ───────
     local win = Instance.new("Frame")
     win.Name = "Window"
-            win.Size = UDim2.new(0, 900, 0, 700)
-    win.Position = UDim2.new(0.5, -450, 0.5, -350)
+    win.Size = UDim2.new(0, 560, 0, 460)
+    win.Position = UDim2.new(0.5, -280, 0.5, -230)
     win.BackgroundColor3 = T.Bg
     win.BorderSizePixel = 0
     win.Parent = sg
-        corner(win, 16)
-    stroke(win, T.Accent, 2, 0.2)
+    corner(win, 8)
+    stroke(win, T.BorderBright, 1, 0)
+
+    -- ── Title Bar (34px) ───────────────────────
+    local titleBar = Instance.new("TextButton")
+    titleBar.Name = "TitleBar"
+    titleBar.Size = UDim2.new(1,0,0,34)
+    titleBar.BackgroundColor3 = T.Panel
+    titleBar.BorderSizePixel = 0
+    titleBar.Text = ""
+    titleBar.AutoButtonColor = false
+    titleBar.Parent = win
+    corner(titleBar, 8)
     
-    -- Add drop shadow effect
-    local shadow = Instance.new("ImageLabel")
-    shadow.Name = "Shadow"
-    shadow.BackgroundTransparency = 1
-    shadow.Position = UDim2.new(0, -20, 0, -20)
-    shadow.Size = UDim2.new(1, 40, 1, 40)
-    shadow.ZIndex = -1
-    shadow.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
-    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.ImageTransparency = 0.7
-    shadow.Parent = win
+    -- Bottom border separator
+    local sep = frm(win, {sz=UDim2.new(1,0,0,1), pos=UDim2.new(0,0,0,34), bg=T.BorderBright})
 
-                -- Subtle gradient overlay
-    local winGrad = Instance.new("UIGradient")
-    winGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(31, 41, 55)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(17, 24, 39)),
-    })
-    winGrad.Rotation = 135
-    winGrad.Parent = win
+    -- Logo dot
+    local logoDot = frm(titleBar, {sz=UDim2.new(0,8,0,8), pos=UDim2.new(0,12,0,13), bg=T.Green})
+    corner(logoDot, 4)
 
-        -- ── Title Bar ────────────────────────────────
-        local titleBar = frame(win, {sz=UDim2.new(1,0,0,60), bg=T.Panel})
-    corner(titleBar, 16)
-    stroke(titleBar, T.Border, 0, 0)
-    
-    local titleGrad = Instance.new("UIGradient")
-    titleGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, T.Panel),
-        ColorSequenceKeypoint.new(1, T.Card),
-    })
-    titleGrad.Rotation = 90
-    titleGrad.Parent = titleBar
-
-            -- Accent line under title bar
-    local accentLine = frame(win, {sz=UDim2.new(1,0,0,2), pos=UDim2.new(0,0,0,60), bg=T.Accent})
-    local accentGrad = Instance.new("UIGradient")
-    accentGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, T.Accent),
-        ColorSequenceKeypoint.new(0.5, T.Purple),
-        ColorSequenceKeypoint.new(1, T.Accent),
-    })
-    accentGrad.Parent = accentLine
-
-    -- Title icon + text
-    local titleIcon = label(titleBar, {
-        text="◈", size=18, color=T.Accent, font=Enum.Font.Code,
-        sz=UDim2.new(0,30,1,0), pos=UDim2.new(0,14,0,0),
-        align=Enum.TextXAlignment.Left
-    })
-            local titleTxt = label(titleBar, {
-        text="Cly Notify", size=22, color=T.Text, font=Enum.Font.GothamBold,
-        sz=UDim2.new(0,260,1,0), pos=UDim2.new(0,50,0,0),
+    -- Title
+    lbl(titleBar, {
+        text="CLY NOTIFY", size=12, color=T.Text, font=Enum.Font.Code,
+        sz=UDim2.new(0,180,1,0), pos=UDim2.new(0,28,0,0),
         align=Enum.TextXAlignment.Left
     })
 
-    -- Status pill
-    local statusPill = frame(titleBar, {sz=UDim2.new(0,140,0,28), pos=UDim2.new(1,-240,0,16), bg=T.Card})
-    corner(statusPill, 11)
-    stroke(statusPill, T.Border, 1, 0)
-        local statusDot = label(statusPill, {
-        text="●", size=12, color=T.AccentDim, font=Enum.Font.GothamBold,
-        sz=UDim2.new(0,20,1,0), pos=UDim2.new(0,10,0,0),
-        align=Enum.TextXAlignment.Left
-    })
+    -- Status (right of title)
     local statusLbl = Instance.new("TextLabel")
     statusLbl.Name = "StatusLbl"
-    statusLbl.Size = UDim2.new(1,-30,1,0)
-    statusLbl.Position = UDim2.new(0,28,0,0)
     statusLbl.BackgroundTransparency = 1
-    statusLbl.Text = "Loading..."
-    statusLbl.TextColor3 = T.Text
-    statusLbl.TextSize = 12
-    statusLbl.Font = Enum.Font.GothamMedium
+    statusLbl.Size = UDim2.new(0,100,1,0)
+    statusLbl.Position = UDim2.new(0,130,0,0)
+    statusLbl.Font = Enum.Font.Code
+    statusLbl.TextSize = 10
+    statusLbl.TextColor3 = T.TextDim
+    statusLbl.Text = "syncing..."
     statusLbl.TextXAlignment = Enum.TextXAlignment.Left
-    statusLbl.Parent = statusPill
+    statusLbl.Parent = titleBar
 
-    -- ── Window Buttons ───────────────────────────
-    local function makeWinBtn(xOffset, bgColor, symbol)
-                local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0,36,0,36)
-        btn.Position = UDim2.new(1, xOffset, 0, 12)
-        btn.BackgroundColor3 = bgColor
-        btn.Text = symbol
-        btn.TextColor3 = T.Bg
-        btn.TextSize = 13
-        btn.Font = Enum.Font.GothamBold
-        btn.BorderSizePixel = 0
-        btn.AutoButtonColor = false
-        btn.Parent = titleBar
-        corner(btn, 4)
-        btn.MouseEnter:Connect(function()
-            btn.BackgroundColor3 = Color3.new(
-                math.min(bgColor.R * 1.3, 1),
-                math.min(bgColor.G * 1.3, 1),
-                math.min(bgColor.B * 1.3, 1)
-            )
+    -- Stat chips (inline in title bar)
+    local function tinyChip(icon, key, xOff)
+        local chip = frm(titleBar, {sz=UDim2.new(0,78,0,22), pos=UDim2.new(1,xOff,0,6), bg=T.Card})
+        corner(chip, 4)
+        stroke(chip, T.Border, 1, 0)
+        lbl(chip, {text=icon, size=10, color=T.TextDim, font=Enum.Font.Code,
+            sz=UDim2.new(0,18,1,0), pos=UDim2.new(0,4,0,0), align=Enum.TextXAlignment.Center})
+        local val = Instance.new("TextLabel")
+        val.Name = key
+        val.BackgroundTransparency = 1
+        val.Size = UDim2.new(1,-22,1,0)
+        val.Position = UDim2.new(0,20,0,0)
+        val.Font = Enum.Font.Code
+        val.TextSize = 11
+        val.TextColor3 = T.Text
+        val.Text = "0"
+        val.TextXAlignment = Enum.TextXAlignment.Left
+        val.Parent = chip
+        return val
+    end
+
+    local totalLbl   = tinyChip("📦", "TotalLbl",  -254)
+    local serverLbl  = tinyChip("🖥", "ServerLbl", -170)
+
+    -- Window buttons
+    local function winBtn(xOff, col, sym)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(0,22,0,22)
+        b.Position = UDim2.new(1,xOff,0,6)
+        b.BackgroundColor3 = col
+        b.Text = sym
+        b.TextColor3 = T.Bg
+        b.TextSize = 10
+        b.Font = Enum.Font.GothamBold
+        b.BorderSizePixel = 0
+        b.AutoButtonColor = false
+        b.Parent = titleBar
+        corner(b, 4)
+        b.MouseEnter:Connect(function()
+            b.BackgroundColor3 = Color3.new(
+                math.min(col.R*1.3,1), math.min(col.G*1.3,1), math.min(col.B*1.3,1))
         end)
-        btn.MouseLeave:Connect(function() btn.BackgroundColor3 = bgColor end)
-        return btn
+        b.MouseLeave:Connect(function() b.BackgroundColor3 = col end)
+        return b
     end
 
-            local closeBtn   = makeWinBtn(-48, T.Red, "✕")
-    local minimizeBtn = makeWinBtn(-92, T.Orange, "—")
+    local closeBtn    = winBtn(-30, Color3.fromRGB(239,68,68), "✕")
+    local minimizeBtn = winBtn(-56, Color3.fromRGB(80,80,80), "—")
 
-        -- ── Stat Bar ─────────────────────────────────
-        local statBar = frame(win, {sz=UDim2.new(1,-40,0,70), pos=UDim2.new(0,20,0,82), bg=T.Panel})
-    corner(statBar, 12)
-    stroke(statBar, T.Border, 1, 0.2)
-    
-    local statGrad = Instance.new("UIGradient")
-    statGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, T.Panel),
-        ColorSequenceKeypoint.new(1, T.Card),
-    })
-    statGrad.Rotation = 90
-    statGrad.Parent = statBar
-
-    local statLayout = Instance.new("UIListLayout")
-    statLayout.FillDirection = Enum.FillDirection.Horizontal
-    statLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    statLayout.Padding = UDim.new(0,0)
-    statLayout.Parent = statBar
-
-            local function statChip(icon, label_text, value_text, color, key)
-        local chip = frame(statBar, {sz=UDim2.new(0,250,1,0), bg=T.Card})
-        corner(chip, 10)
-        stroke(chip, T.Border, 1, 0.1)
-        
-        local iconL = label(chip, {
-            text=icon, size=24, color=color, font=Enum.Font.GothamBold,
-            sz=UDim2.new(0,40,0,40), pos=UDim2.new(0,15,0,15),
-            align=Enum.TextXAlignment.Center
-        })
-        
-        local titleLbl = label(chip, {
-            text=label_text, size=11, color=T.TextDim, font=Enum.Font.GothamMedium,
-            sz=UDim2.new(1,-70,0,16), pos=UDim2.new(0,65,0,12),
-            align=Enum.TextXAlignment.Left
-        })
-        
-        local valueLbl = label(chip, {
-            text=value_text, size=20, color=T.Text, font=Enum.Font.GothamBold,
-            sz=UDim2.new(1,-70,0,28), pos=UDim2.new(0,65,0,30),
-            align=Enum.TextXAlignment.Left
-        })
-        valueLbl.Name = key or "Stat"
-        return chip, valueLbl
-    end
-
-        local _, totalLbl   = statChip("📦", "Total Brainrots", "0", T.Accent, "TotalLbl")
-    local _, serverLbl  = statChip("🖥️", "Active Servers", "0", T.Purple, "ServerLbl")
-    local _, refreshLbl = statChip("🔄", "Last Synced", "--", T.Green, "RefreshLbl")
-
-        -- ── Content Scroll ───────────────────────────
-        local scroll = Instance.new("ScrollingFrame")
+    -- ── Scroll Area ────────────────────────────
+    local scroll = Instance.new("ScrollingFrame")
     scroll.Name = "Scroll"
-    scroll.Size = UDim2.new(1,-40,1,-172)
-    scroll.Position = UDim2.new(0,20,0,162)
-    scroll.BackgroundColor3 = T.Bg
+    scroll.Size = UDim2.new(1,-2,1,-36)
+    scroll.Position = UDim2.new(0,1,0,36)
     scroll.BackgroundTransparency = 1
     scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 8
-    scroll.ScrollBarImageColor3 = T.Accent
+    scroll.ScrollBarThickness = 3
+    scroll.ScrollBarImageColor3 = T.BorderBright
     scroll.CanvasSize = UDim2.new(0,0,0,0)
     scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     scroll.Parent = win
 
-            local listLayout = Instance.new("UIListLayout")
+    local listLayout = Instance.new("UIListLayout")
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Padding = UDim.new(0,16)
+    listLayout.Padding = UDim.new(0,1)
     listLayout.Parent = scroll
 
-        local pad = Instance.new("UIPadding")
-    pad.PaddingTop = UDim.new(0,10)
-    pad.PaddingBottom = UDim.new(0,15)
-    pad.PaddingLeft = UDim.new(0,5)
-    pad.PaddingRight = UDim.new(0,8)
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop    = UDim.new(0,6)
+    pad.PaddingBottom = UDim.new(0,6)
+    pad.PaddingLeft   = UDim.new(0,6)
+    pad.PaddingRight  = UDim.new(0,6)
     pad.Parent = scroll
 
     sg.Parent = CoreGui
 
     return {
-        gui         = sg,
-        win         = win,
-        titleBar    = titleBar,
-        scroll      = scroll,
-        statusLbl   = statusLbl,
-        statusDot   = statusDot,
-        totalLbl    = totalLbl,
-        serverLbl   = serverLbl,
-        refreshLbl  = refreshLbl,
-        closeBtn    = closeBtn,
-        minimizeBtn = minimizeBtn,
+        gui=sg, win=win, titleBar=titleBar, scroll=scroll,
+        statusLbl=statusLbl, totalLbl=totalLbl, serverLbl=serverLbl,
+        closeBtn=closeBtn, minimizeBtn=minimizeBtn,
     }
 end
 
 -- ══════════════════════════════════════════
---  SERVER PANEL  (with dropdown)
+--  SERVER PANEL
 -- ══════════════════════════════════════════
-local function buildServerPanel(serverId, brainrots, placeId, parent)
-    table.sort(brainrots, function(a,b) return (a.income or 0)>(b.income or 0) end)
+local function buildServerPanel(serverId, brainrots, placeId, parent, order)
+    table.sort(brainrots, function(a,b) return (a.income or 0) > (b.income or 0) end)
 
     local isCurrentServer = (serverId == game.JobId)
-    local shortId = serverId:sub(1,18).."…"
-    
-    -- Get player count from first brainrot (they all share same server)
     local playerCount = brainrots[1] and brainrots[1].playerCount or 0
-    
-        -- Check if server should be highlighted (contains high income brainrot 500M+)
+    local shortId = serverId:sub(1,14).."…"
+
     local isHighlighted = false
     for _, br in ipairs(brainrots) do
-        if br.income and br.income >= HIGH_INCOME_THRESHOLD then
-            isHighlighted = true
-            break
+        if (br.income or 0) >= HIGH_INCOME_THRESHOLD then
+            isHighlighted = true; break
         end
     end
-    
-    -- Gold color for highlighted servers
-    local goldColor = Color3.fromRGB(255, 215, 0)
 
-    -- Outer wrapper — auto-sizes
+    -- Wrapper
     local wrapper = Instance.new("Frame")
-    wrapper.Size = UDim2.new(1,-4,0,0)
+    wrapper.Size = UDim2.new(1,0,0,0)
     wrapper.AutomaticSize = Enum.AutomaticSize.Y
     wrapper.BackgroundTransparency = 1
     wrapper.BorderSizePixel = 0
+    wrapper.LayoutOrder = order
     wrapper.Parent = parent
 
-        -- Panel card
+    -- Panel card
     local panel = Instance.new("Frame")
     panel.Size = UDim2.new(1,0,0,0)
     panel.AutomaticSize = Enum.AutomaticSize.Y
@@ -465,23 +365,18 @@ local function buildServerPanel(serverId, brainrots, placeId, parent)
     panel.Parent = wrapper
     corner(panel, 6)
     
-    -- Apply gold border for highlighted servers
-    if isHighlighted then
-        stroke(panel, goldColor, 2, 0)
-    else
-        stroke(panel, isCurrentServer and T.Accent or T.Border, 1, isCurrentServer and 0.3 or 0.0)
-    end
+    local borderColor = isHighlighted and T.Gold or (isCurrentServer and T.Cyan or T.Border)
+    stroke(panel, borderColor, 1, 0)
 
     local panelLayout = Instance.new("UIListLayout")
     panelLayout.SortOrder = Enum.SortOrder.LayoutOrder
     panelLayout.Padding = UDim.new(0,0)
     panelLayout.Parent = panel
 
-        -- ── Header ───────────────────────────────────
+    -- ── Server Header (28px) ──────────────────
     local header = Instance.new("TextButton")
-    header.Name = "Header"
-    header.Size = UDim2.new(1,0,0,44)
-    header.BackgroundColor3 = isHighlighted and Color3.fromRGB(60, 55, 40) or T.Card
+    header.Size = UDim2.new(1,0,0,28)
+    header.BackgroundColor3 = T.Card
     header.BorderSizePixel = 0
     header.Text = ""
     header.AutoButtonColor = false
@@ -489,77 +384,59 @@ local function buildServerPanel(serverId, brainrots, placeId, parent)
     header.Parent = panel
     corner(header, 6)
 
-    -- Accent left border stripe (gold if highlighted)
-    local stripeColor = isHighlighted and goldColor or (isCurrentServer and T.Accent or T.Blue)
-    local stripe = frame(header, {sz=UDim2.new(0,4,0,28), pos=UDim2.new(0,10,0,8), bg=stripeColor})
-    corner(stripe, 2)
-    
-    -- Add gold glow effect for highlighted servers
-    if isHighlighted then
-        local glow = Instance.new("UIGradient")
-        glow.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, goldColor),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 235, 100)),
-            ColorSequenceKeypoint.new(1, goldColor),
-        })
-        glow.Rotation = 90
-        glow.Parent = stripe
-    end
+    -- Left accent strip (2px)
+    local strip = frm(header, {sz=UDim2.new(0,2,0,16), pos=UDim2.new(0,8,0,6),
+        bg=isHighlighted and T.Gold or (isCurrentServer and T.Cyan or T.AccentSub)})
+    corner(strip, 1)
 
-            -- Server ID with gold star if highlighted
-    local serverIdText = isHighlighted and "⭐ "..shortId or shortId
-    local serverIdLbl = label(header, {
-        text=serverIdText, size=13, color=isHighlighted and goldColor or T.Text, font=Enum.Font.Code,
-        sz=UDim2.new(1,-340,1,0), pos=UDim2.new(0,22,0,0),
-        align=Enum.TextXAlignment.Left, truncate=true
-    })
-    if isHighlighted then
-        serverIdLbl.TextStrokeTransparency = 0.7
-        serverIdLbl.TextStrokeColor3 = Color3.fromRGB(100, 80, 0)
-    end
-    
-    -- Player count badge
-    local playerBadge = frame(header, {sz=UDim2.new(0,70,0,22), pos=UDim2.new(1,-308,0,11), bg=T.Bg})
-    corner(playerBadge, 11)
-    stroke(playerBadge, T.Border, 1, 0)
-    label(playerBadge, {
-        text="👥 "..playerCount, size=10, color=T.Accent, font=Enum.Font.Code,
-        align=Enum.TextXAlignment.Center
+    -- Server ID
+    lbl(header, {
+        text=(isHighlighted and "★ " or "")..shortId,
+        size=11, color=isHighlighted and T.Gold or T.TextMid, font=Enum.Font.Code,
+        sz=UDim2.new(1,-280,1,0), pos=UDim2.new(0,18,0,0),
+        align=Enum.TextXAlignment.Left, trunc=true
     })
 
-        -- Found count badge
-    local countBadge = frame(header, {sz=UDim2.new(0,64,0,22), pos=UDim2.new(1,-228,0,11), bg=T.Bg})
-    corner(countBadge, 11)
-    stroke(countBadge, T.Border, 1, 0)
-    label(countBadge, {
-        text=#brainrots.." FOUND", size=10, color=T.Green, font=Enum.Font.Code,
-        align=Enum.TextXAlignment.Center
-    })
+    -- Player count
+    local plrPill = frm(header, {sz=UDim2.new(0,46,0,18), pos=UDim2.new(1,-258,0,5), bg=T.Bg})
+    corner(plrPill, 3)
+    stroke(plrPill, T.Border, 1, 0)
+    lbl(plrPill, {text="👥"..playerCount, size=10, color=T.TextDim, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
 
-        -- Join / Current badge
+    -- Found count
+    local foundPill = frm(header, {sz=UDim2.new(0,50,0,18), pos=UDim2.new(1,-206,0,5), bg=T.Bg})
+    corner(foundPill, 3)
+    stroke(foundPill, T.GreenDim, 1, 0)
+    lbl(foundPill, {text="+"..#brainrots, size=10, color=T.Green, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
+
+    -- Current / Join
     if isCurrentServer then
-        local badge = frame(header, {sz=UDim2.new(0,90,0,24), pos=UDim2.new(1,-155,0,10), bg=T.Bg})
-        corner(badge, 4)
-        stroke(badge, T.Accent, 1, 0.2)
-        label(badge, {
-            text="● THIS SERVER", size=10, color=T.Accent, font=Enum.Font.Code,
-            align=Enum.TextXAlignment.Center
-        })
+        local here = frm(header, {sz=UDim2.new(0,64,0,18), pos=UDim2.new(1,-150,0,5), bg=T.Bg})
+        corner(here, 3)
+        stroke(here, T.Cyan, 1, 0.3)
+        lbl(here, {text="● HERE", size=10, color=T.Cyan, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
     else
         local joinBtn = Instance.new("TextButton")
-        joinBtn.Size = UDim2.new(0,80,0,26)
-        joinBtn.Position = UDim2.new(1,-158,0,9)
-        joinBtn.BackgroundColor3 = T.AccentDim
+        joinBtn.Size = UDim2.new(0,58,0,18)
+        joinBtn.Position = UDim2.new(1,-152,0,5)
+        joinBtn.BackgroundColor3 = Color3.fromRGB(28,28,28)
         joinBtn.Text = "JOIN →"
         joinBtn.TextColor3 = T.Text
-        joinBtn.TextSize = 11
+        joinBtn.TextSize = 10
         joinBtn.Font = Enum.Font.Code
         joinBtn.BorderSizePixel = 0
         joinBtn.AutoButtonColor = false
         joinBtn.Parent = header
-        corner(joinBtn, 4)
-        joinBtn.MouseEnter:Connect(function() joinBtn.BackgroundColor3 = T.Accent end)
-        joinBtn.MouseLeave:Connect(function() joinBtn.BackgroundColor3 = T.AccentDim end)
+        corner(joinBtn, 3)
+        stroke(joinBtn, T.BorderBright, 1, 0)
+        joinBtn.MouseEnter:Connect(function()
+            joinBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+            joinBtn.TextColor3 = T.Accent
+        end)
+        joinBtn.MouseLeave:Connect(function()
+            joinBtn.BackgroundColor3 = Color3.fromRGB(28,28,28)
+            joinBtn.TextColor3 = T.Text
+        end)
         joinBtn.MouseButton1Click:Connect(function()
             joinBtn.Text = "..."
             pcall(function()
@@ -568,145 +445,130 @@ local function buildServerPanel(serverId, brainrots, placeId, parent)
         end)
     end
 
-    -- Dropdown chevron button
+    -- Chevron
     local isOpen = true
-    local chevron = label(header, {
-        text="▾", size=16, color=T.TextDim, font=Enum.Font.Code,
-        sz=UDim2.new(0,28,1,0), pos=UDim2.new(1,-34,0,0),
+    local chevron = lbl(header, {
+        text="▾", size=13, color=T.TextDim, font=Enum.Font.Code,
+        sz=UDim2.new(0,20,1,0), pos=UDim2.new(1,-22,0,0),
         align=Enum.TextXAlignment.Center
     })
 
-    -- ── Body (brainrot list) ──────────────────────
+    -- ── Body ──────────────────────────────────
     local body = Instance.new("Frame")
-    body.Name = "Body"
     body.Size = UDim2.new(1,0,0,0)
     body.AutomaticSize = Enum.AutomaticSize.Y
     body.BackgroundTransparency = 1
     body.BorderSizePixel = 0
     body.LayoutOrder = 2
-    body.ClipsDescendants = true
+    body.ClipsDescendants = false
     body.Parent = panel
 
     local bodyPad = Instance.new("UIPadding")
-    bodyPad.PaddingLeft  = UDim.new(0,10)
-    bodyPad.PaddingRight = UDim.new(0,10)
-    bodyPad.PaddingTop   = UDim.new(0,8)
-    bodyPad.PaddingBottom= UDim.new(0,10)
+    bodyPad.PaddingLeft   = UDim.new(0,6)
+    bodyPad.PaddingRight  = UDim.new(0,6)
+    bodyPad.PaddingTop    = UDim.new(0,3)
+    bodyPad.PaddingBottom = UDim.new(0,6)
     bodyPad.Parent = body
 
     local bodyLayout = Instance.new("UIListLayout")
     bodyLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    bodyLayout.Padding = UDim.new(0,6)
+    bodyLayout.Padding = UDim.new(0,2)
     bodyLayout.Parent = body
 
-        -- ── Brainrot rows ─────────────────────────────
+    -- ── Brainrot Rows (compact 52px each) ─────
     for i, br in ipairs(brainrots) do
         local rarityColor = RARITY[br.rarity] or RARITY["Unknown"]
         local isRainbow = (rarityColor == "rainbow")
+        local isPing = PING_NAMES[br.name]
 
         local row = Instance.new("Frame")
-        row.Size = UDim2.new(1,0,0,66)
+        row.Size = UDim2.new(1,0,0,52)
         row.BackgroundColor3 = T.Bg
         row.BorderSizePixel = 0
         row.LayoutOrder = i
         row.Parent = body
-        corner(row, 5)
-        stroke(row, T.Border, 1, 0)
+        corner(row, 4)
+        stroke(row, isPing and Color3.fromRGB(40,40,60) or T.Border, 1, 0)
 
-                -- Left rarity accent
-        local rac = frame(row, {sz=UDim2.new(0,3,0,50), pos=UDim2.new(0,8,0,8), bg=isRainbow and Color3.fromRGB(255,0,0) or rarityColor})
-        corner(rac, 2)
+        -- Left rarity bar (2px)
+        local rarBar = frm(row, {sz=UDim2.new(0,2,0,36), pos=UDim2.new(0,6,0,8),
+            bg=isRainbow and Color3.fromRGB(255,0,200) or rarityColor})
+        corner(rarBar, 1)
         if isRainbow then
-            local rainbowGrad = Instance.new("UIGradient")
-            rainbowGrad.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0.0, Color3.fromRGB(255, 0, 0)),
-                ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 127, 0)),
-                ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 255, 0)),
-                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 0)),
-                ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
-                ColorSequenceKeypoint.new(0.83, Color3.fromRGB(75, 0, 130)),
-                ColorSequenceKeypoint.new(1.0, Color3.fromRGB(148, 0, 211)),
+            local rg = Instance.new("UIGradient")
+            rg.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0.0,  Color3.fromRGB(255,0,0)),
+                ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255,200,0)),
+                ColorSequenceKeypoint.new(0.5,  Color3.fromRGB(0,255,100)),
+                ColorSequenceKeypoint.new(0.75, Color3.fromRGB(0,100,255)),
+                ColorSequenceKeypoint.new(1.0,  Color3.fromRGB(200,0,255)),
             })
-            rainbowGrad.Rotation = 90
-            rainbowGrad.Parent = rac
+            rg.Rotation = 90
+            rg.Parent = rarBar
         end
 
-        -- Name
-        label(row, {
-            text=br.name, size=13, color=T.Text, font=Enum.Font.Code,
-            sz=UDim2.new(1,-175,0,18), pos=UDim2.new(0,20,0,8),
-            align=Enum.TextXAlignment.Left, truncate=true
-        })
-
-                -- Time ago (color-coded by age)
-        label(row, {
-            text=timeAgo(br.foundAt).." ago", size=10, color=getTimeColor(br.foundAt), font=Enum.Font.Code,
-            sz=UDim2.new(0,70,0,14), pos=UDim2.new(1,-150,0,10),
-            align=Enum.TextXAlignment.Right
-        })
-
-                -- Rarity badge
-        local rb = frame(row, {sz=UDim2.new(0,56,0,18), pos=UDim2.new(1,-70,0,8), bg=isRainbow and Color3.fromRGB(255,0,0) or T.Bg})
-        corner(rb, 9)
-        if isRainbow then
-            local rainbowGrad = Instance.new("UIGradient")
-            rainbowGrad.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0.0, Color3.fromRGB(255, 0, 0)),
-                ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 127, 0)),
-                ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 255, 0)),
-                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 0)),
-                ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
-                ColorSequenceKeypoint.new(0.83, Color3.fromRGB(75, 0, 130)),
-                ColorSequenceKeypoint.new(1.0, Color3.fromRGB(148, 0, 211)),
-            })
-            rainbowGrad.Parent = rb
-            stroke(rb, Color3.fromRGB(255, 0, 0), 1, 0)
-        else
-            stroke(rb, rarityColor, 1, 0)
+        -- Ping indicator dot
+        if isPing then
+            local dot = frm(row, {sz=UDim2.new(0,5,0,5), pos=UDim2.new(0,12,0,6), bg=T.Purple})
+            corner(dot, 3)
         end
-        local rarityLbl = label(rb, {
-            text=br.rarity, size=10, color=isRainbow and Color3.fromRGB(255,255,255) or rarityColor, font=Enum.Font.Code,
+
+        -- ── Row line 1: Name + rarity + time ──
+        lbl(row, {
+            text=br.name, size=12, color=T.Text, font=Enum.Font.Code,
+            sz=UDim2.new(1,-145,0,16), pos=UDim2.new(0,16,0,6),
+            align=Enum.TextXAlignment.Left, trunc=true
+        })
+
+        -- Rarity badge (right side)
+        local rCol = isRainbow and Color3.fromRGB(200,100,255) or rarityColor
+        local rb = frm(row, {sz=UDim2.new(0,52,0,15), pos=UDim2.new(1,-110,0,7), bg=T.Bg})
+        corner(rb, 3)
+        stroke(rb, rCol, 1, 0.3)
+        local rLbl = lbl(rb, {
+            text=br.rarity, size=9, color=rCol, font=Enum.Font.Code,
             align=Enum.TextXAlignment.Center
         })
         if isRainbow then
-            rarityLbl.TextStrokeTransparency = 0.5
-            rarityLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        end
-
-        -- Stat line: income | cost | mutation | traits
-        local statRow = Instance.new("Frame")
-        statRow.Size = UDim2.new(1,-20,0,16)
-        statRow.Position = UDim2.new(0,20,0,30)
-        statRow.BackgroundTransparency = 1
-        statRow.Parent = row
-
-        local statLayout = Instance.new("UIListLayout")
-        statLayout.FillDirection = Enum.FillDirection.Horizontal
-        statLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-        statLayout.Padding = UDim.new(0,0)
-        statLayout.Parent = statRow
-
-        local function statItem(icon, val, color, w)
-            local s = frame(statRow, {sz=UDim2.new(0,w,1,0), bg=T.Transparent})
-            s.BackgroundTransparency = 1
-            label(s, {
-                text=icon.." "..val, size=11, color=color, font=Enum.Font.Code,
-                align=Enum.TextXAlignment.Left
+            local rg2 = Instance.new("UIGradient")
+            rg2.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0,   Color3.fromRGB(255,80,80)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80,255,180)),
+                ColorSequenceKeypoint.new(1,   Color3.fromRGB(180,80,255)),
             })
+            rg2.Parent = rLbl
         end
-        statItem("$", short(br.income).."/s", T.Green, 110)
-        statItem("¢", short(br.cost),          T.Yellow, 100)
 
-        -- Details line
-        label(row, {
-            text="◈ "..( br.mutation or "—" ).."   ◎ "..( br.traits or "—" ),
-            size=10, color=T.TextDim, font=Enum.Font.Code,
-            sz=UDim2.new(1,-20,0,14), pos=UDim2.new(0,20,0,50),
-            align=Enum.TextXAlignment.Left, truncate=true
+        -- Time ago
+        lbl(row, {
+            text=timeAgo(br.foundAt), size=10, color=getTimeColor(br.foundAt), font=Enum.Font.Code,
+            sz=UDim2.new(0,44,0,15), pos=UDim2.new(1,-54,0,8),
+            align=Enum.TextXAlignment.Right
         })
+
+        -- ── Row line 2: Income | Cost | Mutation | Traits ──
+        local line2 = frm(row, {sz=UDim2.new(1,-16,0,16), pos=UDim2.new(0,16,0,28), bg=T.Transparent})
+        line2.BackgroundTransparency = 1
+
+        local l2layout = Instance.new("UIListLayout")
+        l2layout.FillDirection = Enum.FillDirection.Horizontal
+        l2layout.VerticalAlignment = Enum.VerticalAlignment.Center
+        l2layout.Padding = UDim.new(0,0)
+        l2layout.Parent = line2
+
+        local function stat2(icon, val, col, w)
+            local s = frm(line2, {sz=UDim2.new(0,w,1,0), bg=T.Transparent})
+            s.BackgroundTransparency = 1
+            lbl(s, {text=icon..val, size=10, color=col, font=Enum.Font.Code, align=Enum.TextXAlignment.Left})
+        end
+
+        stat2("$", short(br.income).."/s", T.Green, 100)
+        stat2("¢", short(br.cost),          T.Yellow, 86)
+        stat2("◈", br.mutation or "—",      T.TextDim, 90)
+        stat2("◎", br.traits or "—",        T.TextDim, 0)
     end
 
-    -- ── Dropdown toggle ───────────────────────────
+    -- ── Dropdown toggle ───────────────────────
     local function setOpen(open)
         isOpen = open
         body.Visible = open
@@ -714,15 +576,9 @@ local function buildServerPanel(serverId, brainrots, placeId, parent)
         chevron.TextColor3 = open and T.TextMid or T.TextDim
     end
 
-        header.MouseButton1Click:Connect(function()
-        setOpen(not isOpen)
-    end)
-    header.MouseEnter:Connect(function()
-        header.BackgroundColor3 = isHighlighted and Color3.fromRGB(70, 60, 45) or T.CardHover
-    end)
-    header.MouseLeave:Connect(function()
-        header.BackgroundColor3 = isHighlighted and Color3.fromRGB(60, 55, 40) or T.Card
-    end)
+    header.MouseButton1Click:Connect(function() setOpen(not isOpen) end)
+    header.MouseEnter:Connect(function() header.BackgroundColor3 = T.CardHover end)
+    header.MouseLeave:Connect(function() header.BackgroundColor3 = T.Card end)
 
     return wrapper
 end
@@ -732,21 +588,18 @@ end
 -- ══════════════════════════════════════════
 local function updateGUI(ui, data)
     if not data then
-        ui.statusDot.TextColor3 = T.Red
-        ui.statusLbl.Text = "ERROR"
+        ui.statusLbl.Text = "· error"
+        ui.statusLbl.TextColor3 = T.Red
         return
     end
 
-        ui.statusDot.TextColor3 = T.Green
-    ui.statusLbl.Text = timeAgo(data.timestamp).." ago"
-    ui.refreshLbl.Text = timeAgo(data.timestamp).." ago"
+    ui.statusLbl.Text = "· "..timeAgo(data.timestamp).." ago"
+    ui.statusLbl.TextColor3 = T.Green
 
-    -- Clear old panels
     for _, ch in ipairs(ui.scroll:GetChildren()) do
         if ch:IsA("Frame") then ch:Destroy() end
     end
 
-    -- Group by server
     local groups = {}
     for _, br in ipairs(data.brainrots or {}) do
         local sid = br.serverId or "unknown"
@@ -754,14 +607,12 @@ local function updateGUI(ui, data)
         table.insert(groups[sid], br)
     end
 
-    local total = #(data.brainrots or {})
-    local serverCount = 0
+    local total, serverCount = #(data.brainrots or {}), 0
     for _ in pairs(groups) do serverCount = serverCount + 1 end
 
-        ui.totalLbl.Text  = tostring(total)
-    ui.serverLbl.Text = tostring(serverCount)
+    ui.totalLbl.Text  = tostring(total)
+    ui.serverLbl.Text = tostring(serverCount).." srv"
 
-    -- Sort servers newest first
     local sorted = {}
     for sid, brs in pairs(groups) do
         local t = 0
@@ -770,8 +621,8 @@ local function updateGUI(ui, data)
     end
     table.sort(sorted, function(a,b) return a.latest > b.latest end)
 
-    for _, s in ipairs(sorted) do
-        buildServerPanel(s.id, s.brs, data.placeId, ui.scroll)
+    for idx, s in ipairs(sorted) do
+        buildServerPanel(s.id, s.brs, data.placeId, ui.scroll, idx)
     end
 end
 
@@ -781,73 +632,58 @@ end
 local function main()
     local ui = buildGUI()
 
-    -- Close
     ui.closeBtn.MouseButton1Click:Connect(function()
         ui.gui:Destroy()
     end)
 
-    -- Minimize toggle
     local minimized = false
-    local fullHeight = 640
     ui.minimizeBtn.MouseButton1Click:Connect(function()
         minimized = not minimized
-        if minimized then
-            ui.win.Size = UDim2.new(0, 760, 0, 42)
-            ui.scroll.Visible = false
-        else
-            ui.win.Size = UDim2.new(0, 760, 0, fullHeight)
-            ui.scroll.Visible = true
-        end
+        ui.scroll.Visible = not minimized
+        ui.win.Size = minimized
+            and UDim2.new(0,560,0,36)
+            or  UDim2.new(0,560,0,460)
         ui.minimizeBtn.Text = minimized and "□" or "—"
     end)
 
-    -- Stat bar hides when minimized (part of scroll area already handled)
-
-        -- Fetch + display
     local data = fetchGistData()
     if data then
         lastKnownTimestamp = data.timestamp
         updateGUI(ui, data)
     end
 
-    -- Fast refresh loop with timestamp checking
     task.spawn(function()
         while ui.gui.Parent do
             task.wait(REFRESH_INTERVAL)
-            data = fetchGistData()
-            if ui.gui.Parent and data then
-                -- Only update UI if data actually changed
-                if data.timestamp ~= lastKnownTimestamp then
-                    lastKnownTimestamp = data.timestamp
-                    updateGUI(ui, data)
-                    print("[Viewer] 🔄 Synced new data from Gist")
+            local newData = fetchGistData()
+            if ui.gui.Parent and newData then
+                if newData.timestamp ~= lastKnownTimestamp then
+                    lastKnownTimestamp = newData.timestamp
+                    updateGUI(ui, newData)
+                    print("[Viewer] 🔄 Synced new data")
                 end
             end
         end
     end)
 
-    -- Draggable via title bar
+    -- Draggable
     local dragging, dragStart, winStart
     ui.titleBar.InputBegan:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = inp.Position
-            winStart  = ui.win.Position
+            winStart = ui.win.Position
             inp.Changed:Connect(function()
-                if inp.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
+                if inp.UserInputState == Enum.UserInputState.End then dragging = false end
             end)
         end
     end)
-    local lastDragInput
+    local lastDrag
     ui.titleBar.InputChanged:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseMovement then
-            lastDragInput = inp
-        end
+        if inp.UserInputType == Enum.UserInputType.MouseMovement then lastDrag = inp end
     end)
     UserInputService.InputChanged:Connect(function(inp)
-        if inp == lastDragInput and dragging then
+        if inp == lastDrag and dragging then
             local delta = inp.Position - dragStart
             ui.win.Position = UDim2.new(
                 winStart.X.Scale, winStart.X.Offset + delta.X,
