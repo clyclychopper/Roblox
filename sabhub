@@ -247,9 +247,62 @@ local function buildGUI()
     statusLbl.TextXAlignment = Enum.TextXAlignment.Left
     statusLbl.Parent = titleBar
 
-    -- Stat chips (inline in title bar) — with a neat divider gap between them
+    -- Title bar right side layout (from right edge, no overlaps):
+    --  [✕]       pos X: UDim2(1,-30, ...)   width 22
+    --  [–]       pos X: UDim2(1,-56, ...)   width 22
+    --  [↺]       pos X: UDim2(1,-82, ...)   width 22
+    --  divider   pos X: UDim2(1,-92, ...)   width 1
+    --  chip "Servers" pos X: UDim2(1,-182, ...)  width 88
+    --  divider   pos X: UDim2(1,-190, ...)  width 1
+    --  chip "Total"   pos X: UDim2(1,-280, ...)  width 88
+
+    -- Helper: small 22×22 action button with solid bg
+    local function winBtn(xPos, sym, normalBg, hoverBg, normalCol, hoverCol)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(0,22,0,22)
+        b.Position = UDim2.new(1,xPos,0,6)
+        b.BackgroundColor3 = normalBg
+        b.Text = sym
+        b.TextColor3 = normalCol
+        b.TextSize = 12
+        b.Font = Enum.Font.GothamBold
+        b.BorderSizePixel = 0
+        b.AutoButtonColor = false
+        b.Parent = titleBar
+        corner(b, 4)
+        b.MouseEnter:Connect(function()
+            b.BackgroundColor3 = hoverBg
+            b.TextColor3 = hoverCol
+        end)
+        b.MouseLeave:Connect(function()
+            b.BackgroundColor3 = normalBg
+            b.TextColor3 = normalCol
+        end)
+        return b
+    end
+
+    -- ✕ close — rightmost
+    local closeBtn = winBtn(-30, "✕",
+        Color3.fromRGB(48,18,18), Color3.fromRGB(239,68,68),
+        Color3.fromRGB(239,68,68), Color3.fromRGB(255,255,255))
+
+    -- – minimize
+    local minimizeBtn = winBtn(-56, "–",
+        Color3.fromRGB(30,30,30), Color3.fromRGB(50,50,50),
+        Color3.fromRGB(160,160,160), Color3.fromRGB(220,220,220))
+
+    -- ↺ resync
+    local resyncBtn = winBtn(-82, "↺",
+        Color3.fromRGB(18,30,20), Color3.fromRGB(20,50,25),
+        Color3.fromRGB(74,222,128), Color3.fromRGB(134,239,172))
+    resyncBtn.Name = "ResyncBtn"
+
+    -- Divider before chips
+    frm(titleBar, {sz=UDim2.new(0,1,0,16), pos=UDim2.new(1,-94,0,9), bg=T.BorderBright})
+
+    -- Stat chips — each 88px wide
     local function tinyChip(icon, key, xOff, accentCol)
-        local chip = frm(titleBar, {sz=UDim2.new(0,90,0,22), pos=UDim2.new(1,xOff,0,6), bg=T.Card})
+        local chip = frm(titleBar, {sz=UDim2.new(0,88,0,22), pos=UDim2.new(1,xOff,0,6), bg=T.Card})
         corner(chip, 4)
         stroke(chip, T.Border, 1, 0)
         local chipAccent = frm(chip, {sz=UDim2.new(0,2,0,12), pos=UDim2.new(0,0,0,5), bg=accentCol or T.AccentSub})
@@ -270,68 +323,9 @@ local function buildGUI()
         return val
     end
 
-    local totalLbl  = tinyChip("📦", "TotalLbl",  -284, T.Green)
-    -- slim vertical divider between the two chips
-    frm(titleBar, {sz=UDim2.new(0,1,0,16), pos=UDim2.new(1,-188,0,9), bg=T.BorderBright})
-    local serverLbl = tinyChip("🖥", "ServerLbl", -186, T.Blue)
-
-    -- Window buttons — right edge cluster: [↺] [–] [✕]
-    -- Each is a 24×24 pill with background, spaced 4px apart from right
-    -- ✕ @ right edge -6, – @ -34, ↺ @ -62
-    local function winBtn(xOff, sym, normalBg, hoverBg, normalCol, hoverCol)
-        local b = Instance.new("TextButton")
-        b.Size = UDim2.new(0,24,0,24)
-        b.Position = UDim2.new(1,xOff,0,5)
-        b.BackgroundColor3 = normalBg
-        b.Text = sym
-        b.TextColor3 = normalCol
-        b.TextSize = 13
-        b.Font = Enum.Font.GothamBold
-        b.BorderSizePixel = 0
-        b.AutoButtonColor = false
-        b.Parent = titleBar
-        corner(b, 5)
-        b.MouseEnter:Connect(function()
-            b.BackgroundColor3 = hoverBg
-            b.TextColor3 = hoverCol
-        end)
-        b.MouseLeave:Connect(function()
-            b.BackgroundColor3 = normalBg
-            b.TextColor3 = normalCol
-        end)
-        return b
-    end
-
-    local closeBtn    = winBtn(-30, "✕",
-        Color3.fromRGB(50,20,20), Color3.fromRGB(248,113,113),
-        Color3.fromRGB(248,113,113), Color3.fromRGB(255,255,255))
-    local minimizeBtn = winBtn(-58, "–",
-        T.Card, T.CardHover,
-        T.TextDim, T.TextMid)
-
-    -- Resync button — same style, green tint
-    local resyncBtn = Instance.new("TextButton")
-    resyncBtn.Name = "ResyncBtn"
-    resyncBtn.Size = UDim2.new(0,24,0,24)
-    resyncBtn.Position = UDim2.new(1,-86,0,5)
-    resyncBtn.BackgroundColor3 = T.Card
-    resyncBtn.Text = "↺"
-    resyncBtn.TextColor3 = T.TextDim
-    resyncBtn.TextSize = 13
-    resyncBtn.Font = Enum.Font.GothamBold
-    resyncBtn.BorderSizePixel = 0
-    resyncBtn.AutoButtonColor = false
-    resyncBtn.Parent = titleBar
-    corner(resyncBtn, 5)
-    stroke(resyncBtn, T.Border, 1, 0)
-    resyncBtn.MouseEnter:Connect(function()
-        resyncBtn.BackgroundColor3 = Color3.fromRGB(20,40,25)
-        resyncBtn.TextColor3 = T.Green
-    end)
-    resyncBtn.MouseLeave:Connect(function()
-        resyncBtn.BackgroundColor3 = T.Card
-        resyncBtn.TextColor3 = T.TextDim
-    end)
+    local serverLbl = tinyChip("🖥", "ServerLbl", -183, T.Blue)
+    frm(titleBar, {sz=UDim2.new(0,1,0,16), pos=UDim2.new(1,-191,0,9), bg=T.BorderBright})
+    local totalLbl  = tinyChip("📦", "TotalLbl",  -280, T.Green)
 
     -- ── Scroll Area ────────────────────────────
     local scroll = Instance.new("ScrollingFrame")
