@@ -11,7 +11,7 @@ local WEBHOOK_4 = getgenv().Webhook4 or error("❌ Webhook4 not set!")  -- every
 
 -- Debug: Print credentials status
 print("[Config] Webhook:", WEBHOOK_4 and "✅ Set" or "❌ Missing")
-local MIN_INCOME = 1000000  -- 1m minimum for webhook 1
+local MIN_INCOME = 5000000  -- 1m minimum for webhook 1
 local WEBHOOK_4_MIN = 10000000  -- 10m minimum for webhook 4
 local MID_THRESHOLD = 50000000  -- 50m
 local HIGH_THRESHOLD = 500000000  -- 500m
