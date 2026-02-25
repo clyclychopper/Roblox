@@ -275,49 +275,62 @@ local function buildGUI()
     frm(titleBar, {sz=UDim2.new(0,1,0,16), pos=UDim2.new(1,-188,0,9), bg=T.BorderBright})
     local serverLbl = tinyChip("🖥", "ServerLbl", -186, T.Blue)
 
-    -- Window buttons (minimal, no background box)
-    local function winBtn(xOff, sym, hoverCol)
+    -- Window buttons — right edge cluster: [↺] [–] [✕]
+    -- Each is a 24×24 pill with background, spaced 4px apart from right
+    -- ✕ @ right edge -6, – @ -34, ↺ @ -62
+    local function winBtn(xOff, sym, normalBg, hoverBg, normalCol, hoverCol)
         local b = Instance.new("TextButton")
-        b.Size = UDim2.new(0,24,1,0)
-        b.Position = UDim2.new(1,xOff,0,0)
-        b.BackgroundTransparency = 1
+        b.Size = UDim2.new(0,24,0,24)
+        b.Position = UDim2.new(1,xOff,0,5)
+        b.BackgroundColor3 = normalBg
         b.Text = sym
-        b.TextColor3 = T.TextDim
-        b.TextSize = 14
-        b.Font = Enum.Font.Code
+        b.TextColor3 = normalCol
+        b.TextSize = 13
+        b.Font = Enum.Font.GothamBold
         b.BorderSizePixel = 0
         b.AutoButtonColor = false
         b.Parent = titleBar
-        b.MouseEnter:Connect(function() b.TextColor3 = hoverCol end)
-        b.MouseLeave:Connect(function() b.TextColor3 = T.TextDim end)
+        corner(b, 5)
+        b.MouseEnter:Connect(function()
+            b.BackgroundColor3 = hoverBg
+            b.TextColor3 = hoverCol
+        end)
+        b.MouseLeave:Connect(function()
+            b.BackgroundColor3 = normalBg
+            b.TextColor3 = normalCol
+        end)
         return b
     end
 
-    local closeBtn    = winBtn(-28, "✕", Color3.fromRGB(248,113,113))
-    local minimizeBtn = winBtn(-52, "–", T.TextMid)
+    local closeBtn    = winBtn(-30, "✕",
+        Color3.fromRGB(50,20,20), Color3.fromRGB(248,113,113),
+        Color3.fromRGB(248,113,113), Color3.fromRGB(255,255,255))
+    local minimizeBtn = winBtn(-58, "–",
+        T.Card, T.CardHover,
+        T.TextDim, T.TextMid)
 
-    -- Resync button (small ↺, sits beside minimize)
+    -- Resync button — same style, green tint
     local resyncBtn = Instance.new("TextButton")
     resyncBtn.Name = "ResyncBtn"
-    resyncBtn.Size = UDim2.new(0,22,0,22)
-    resyncBtn.Position = UDim2.new(1,-80,0,6)
+    resyncBtn.Size = UDim2.new(0,24,0,24)
+    resyncBtn.Position = UDim2.new(1,-86,0,5)
     resyncBtn.BackgroundColor3 = T.Card
     resyncBtn.Text = "↺"
     resyncBtn.TextColor3 = T.TextDim
-    resyncBtn.TextSize = 14
-    resyncBtn.Font = Enum.Font.Code
+    resyncBtn.TextSize = 13
+    resyncBtn.Font = Enum.Font.GothamBold
     resyncBtn.BorderSizePixel = 0
     resyncBtn.AutoButtonColor = false
     resyncBtn.Parent = titleBar
-    corner(resyncBtn, 4)
+    corner(resyncBtn, 5)
     stroke(resyncBtn, T.Border, 1, 0)
     resyncBtn.MouseEnter:Connect(function()
+        resyncBtn.BackgroundColor3 = Color3.fromRGB(20,40,25)
         resyncBtn.TextColor3 = T.Green
-        resyncBtn.BackgroundColor3 = T.CardHover
     end)
     resyncBtn.MouseLeave:Connect(function()
-        resyncBtn.TextColor3 = T.TextDim
         resyncBtn.BackgroundColor3 = T.Card
+        resyncBtn.TextColor3 = T.TextDim
     end)
 
     -- ── Scroll Area ────────────────────────────
