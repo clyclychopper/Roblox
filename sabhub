@@ -11,6 +11,269 @@ local REFRESH_INTERVAL = 5
 local USE_MOCK_DATA = false
 local lastKnownTimestamp = 0
 
+-- TABLES
+
+-- Income table for Auto Grab
+local incomeByName = {
+    ["Swaggy Bros"] = 40000000,
+    ["Los Amigos"] = 130000000,
+    ["Sammyni Fattini"] = 70000000,
+    ["John Pork"] = 999999999999999,
+    ["Smurf Cat"] = 999999999999999,
+
+    ["La Food Combinasion"] = 90000000,
+    ["Los Sekolahs"] = 110000000,
+    --GOD
+    ["Tim Cheese"] = 20,
+    ["Fizzy Soda"] = 17200,
+    ["Cocofanto Elefanto"] = 10000,
+    ["Antonio"] = 18500,
+    ["Girafa Celestre"] = 20000,
+    ["Gattatino Nyanino"] = 35000,
+    ["Gattatino Neonino"] = 20000,
+    ["Chihuanini Taconini"] = 45000,
+    ["Matteo"] = 50000,
+    ["Tralalero Tralala"] = 50000,
+    ["Los Crocodillitos"] = 55000,
+    ["Tigroligre Frutonni"] = 60000,
+    ["Odin Din Din Dun"] = 75000,
+    ["Orcalero Orcala"] = 100000,
+    ["Money Money Man"] = 65000,
+    ["Alessio"] = 65000,
+    ["Unclito Samito"] = 65000,
+    ["Statutino Libertino"] = 75000,
+    ["Tipi Topi Taco"] = 75000,
+    ["Tralalita Tralala"] = 100000,
+    ["Tukanno Banana"] = 100000,
+    ["Extinct Ballerina"] = 125000,
+    ["Vampira Cappucina"] = 125000,
+    ["Espresso Signora"] = 70000,
+    ["Trenozosturzzo Turbo 3000"] = 150000,
+    ["Bulbito Bandito Traktorito"] = 205000,
+    ["Urubini Flamenguini"] = 150000,
+    ["Jacko Jack Jack"] = 150000,
+    ["Trippi Troppi Troppa Trippa"] = 175000,
+    ["Capi Taco"] = 155000,
+    ["Los Chihuaninis"] = 160000,
+    ["Gattito Tacoto"] = 165000,
+    ["Las Capuchinas"] = 185000,
+    ["Ballerino Lololo"] = 200000,
+    ["Los Tungtungtungcitos"] = 210000,
+    ["Pakrahmatmamat"] = 215000,
+    ["Ballerina Peppermintina"] = 215000,
+    ["Piccione Macchina"] = 225000,
+    ["Pakrahmatmatina"] = 225000,
+    ["Los Bombinitos"] = 220000,
+    ["Tractoro Dinosauro"] = 230000,
+    ["Brr Es Teh Patipum"] = 225000,
+    ["Cacasito Satalito"] = 240000,
+    ["Orcalita Orcala"] = 240000,
+    ["Aquanaut"] = 245000,
+    ["Tartaruga Cisterna"] = 250000,
+    ["Snailenzo"] = 250000,
+    ["Corn Corn Corn Sahur"] = 250000,
+    ["Squalanana"] = 250000,
+    ["Mummy Ambalabu"] = 250000,
+    ["Los Orcalitos"] = 310000,
+    ["Dug Dug Dug"] = 255000,
+    ["Ginger Globo"] = 257500,
+    ["Yeti Claus"] = 267500,
+    ["Crabbo Limonetta"] = 230000,
+    ["Los Tipi Tacos"] = 260000,
+    ["Tootini Shrimpini"] = 260000,
+    ["Granchiello Spiritell"] = 260000,
+    ["Frio Ninja"] = 265000,
+    ["Piccionetta Macchina"] = 270000,
+    ["Boba Panda"] = 270000,
+    ["Mastodontico Telepiedone"] = 275000,
+    ["Los Gattitos"] = 275000,
+    ["Bambu Bambu Sahur"] = 275000,
+    ["Chrismasmamat"] = 277500,
+    ["Anpali Babel"] = 280000,
+    ["Cappuccino Clownino"] = 285000,
+    ["Luv Luv Luv"] = 282000,
+    ["Bombardini Tortinii"] = 225000,
+    ["Brasilini Berimbini"] = 285000,
+    ["Belula Beluga"] = 290000,
+    ["Krupuk Pagi Pagi"] = 290000,
+    ["Skull Skull Skull"] = 290000,
+    ["Cocoa Assassino"] = 291000,
+    ["Tentacolo Tecnico"] = 295000,
+    ["Ginger Cisterna"] = 293500,
+    ["Dolphini Jetskini"] = 294500,
+    ["Pop Pop Sahur"] = 295000,
+    ["Noo La Polizia"] = 280000,
+    ["Karkerheart Luvkur"] = 297500,
+
+    --SECRET
+    ["La Taco Combinasion"] = 35000000,
+    ["La Vacca Saturno Saturnita"] = 300000,
+    ["Pandanini Frostini"] = 294000,
+    ["Bisonte Giuppitere"] = 300000,
+    ["Blackhole Goat"] = 400000,
+    ["Jackorilla"] = 315000,
+    ["Agarrini Ia Palini"] = 425000,
+    ["Chachechi"] = 400000,
+    ["Karkerkar Kurkur"] = 275000,
+    ["Los Tortus"] = 500000,
+    ["Los Matteos"] = 300000,
+    ["Sammyni Spyderini"] = 300000,
+    ["Trenostruzzo Turbo 4000"] = 310000,
+    ["Chimpanzini Spiderini"] = 325000,
+    ["Boatito Auratito"] = 525000,
+    ["Fragola La La La"] = 450000,
+    ["Dul Dul Dul"] = 375000,
+    ["La Vacca Prese Presente"] = 600000,
+    ["Frankentteo"] = 700000,
+    ["Los Trios"] = 700000,
+    ["Karker Sahur"] = 725000,
+    ["Torrtuginni Dragonfrutini"] = 350000,
+    ["Los Tralaleritos"] = 500000,
+    ["Zombie Tralala"] = 500000,
+    ["La Cucaracha"] = 475000,
+    ["Vulturino Skeletono"] = 500000,
+    ["Guerriro Digitale"] = 550000,
+    ["Extinct Tralalero"] = 450000,
+    ["Yess My Examine"] = 575000,
+    ["Extinct Matteo"] = 625000,
+    ["Las Tralaleritas"] = 650000,
+    ["Rocco Disco"] = 650000,
+    ["Reindeer Tralala"] = 600000,
+    ["Las Vaquitas Saturnitas"] = 750000,
+    ["Pumpkin Spyderini"] = 650000,
+    ["Job Job Job Sahur"] = 700000,
+    ["Los Karkeritos"] = 750000,
+    ["Graipuss Medussi"] = 1000000,
+    ["Santteo"] = 800000,
+    ["La Vacca Jacko Linterino"] = 850000,
+    ["Triplito Tralaleritos"] = 875000,
+    ["Trickolino"] = 900000,
+    ["Giftini Spyderini"] = 999900,
+    ["Los Spyderinis"] = 450000,
+    ["Love Love Love Sahur"] = 1000000,
+    ["Perrito Burrito"] = 1000000,
+    ["1x1x1x1"] = 1100000,
+    ["Los Cucarachas"] = 1200000,
+    ["Please My Present"] = 1300000,
+    ["Cuadramat and Pakrahmatmamat"] = 1400000,
+    ["Los Jobcitos"] = 1500000,
+    ["Nooo My Hotspot"] = 2000000,
+    ["Pot Hotspot"] = 2500000,
+    ["Noo My Examine"] = 1700000,
+    ["Telemorte"] = 2000000,
+    ["La Sahur Combinasion"] = 2000000,
+    ["List List List Sahur"] = 2000000,
+    ["To To To Sahur"] = 2500000,
+    ["Pirulitoita Bicicletaire"] = 2500000,
+    ["25"] = 2500000,
+    ["Santa Hotspot"] = 2600000,
+    ["Horegini Boom"] = 2700000,
+    ["Quesadilla Crocodila"] = 3000000,
+    ["Pot Pumpkin"] = 3000000,
+    ["Naughty Naughty"] = 3000000,
+    ["Cupid Cupid Sahur"] = 3100000,
+    ["Ho Ho Ho Sahur"] = 3200000,
+    ["Mi Gatito"] = 3200000,
+    ["Chicleteira Bicicleteira"] = 3500000,
+    ["Cupid Hotspot"] = 3500000,
+    ["Spaghetti Tualetti"] = 60000000,
+    ["Esok Sekolah"] = 30000000,
+    ["Quesadillo Vampiro"] = 3500000,
+    ["Brunito Marsito"] = 3500000,
+    ["Chill Puppy"] = 4000000,
+    ["Burrito Bandito"] = 4000000,
+    ["Chicleteirina Bicicleteirina"] = 4000000,
+    ["Los Quesadillas"] = 4500000,
+    ["Bunito Bunito Spinito"] = 3000000,
+    ["Noo My Candy"] = 5000000,
+    ["Los Nooo My Hotspotsitos"] = 5000000,
+    ["La Grande Combinassion"] = 10000000,
+    ["Rang Ring Bus"] = 6000000,
+    ["Guest 666"] = 6600000,
+    ["Los Mi Gatitos"] = 6500000,
+    ["Los Chicleteiras"] = 7000000,
+    ["67"] = 7500000,
+    ["Donkeyturbo Express"] = 7500000,
+    ["Mariachi Corazoni"] = 12500000,
+    ["Los Burritos"] = 8500000,
+    ["Los 25"] = 10000000,
+    ["Swag Soda"] = 13000000,
+    ["Noo my Heart"] = 13000000,
+    ["Chimnino"] = 14000000,
+    ["Los Combinasionas"] = 15000000,
+    ["Chicleteira Noelteira"] = 15000000,
+    ["Fishino Clownino"] = 15500000,
+    ["Tacorita Bicicleta"] = 16500000,
+    ["Spinny Hammy"] = 17000000,
+    ["Nuclearo Dinosauro"] = 15000000,
+    ["Las Sis"] = 17500000,
+    ["Chicleteira Cupideira"] = 17500000,
+    ["La Karkerkar Combinasion"] = 17500000,
+    ["Chillin Chili"] = 25000000,
+    ["Chipso and Queso"] = 25000000,
+    ["Money Money Reindeer"] = 25000000,
+    ["Money Money Puggy"] = 21000000,
+    ["Celularcini Viciosini"] = 22500000,
+    ["Los Planitos"] = 18500000,
+    ["Los Mobilis"] = 22000000,
+    ["Los 67"] = 22500000,
+    ["Mieteteira Bicicleteira"] = 26000000,
+    ["Tuff Toucan"] = 26000000,
+    ["La Spooky Grande"] = 24500000,
+    ["Los Spooky Combinasionas"] = 20000000,
+    ["Los Candies"] = 23000000,
+    ["Los Hotspositos"] = 25000000,
+    ["Los Jolly Combinasionas"] = 25000000,
+    ["Los Puggies"] = 30000000,
+    ["W or L"] = 30000000,
+    ["Tralalalaledon"] = 37500000,
+    ["La Extinct Grande"] = 23500000,
+    ["Tralaledon"] = 27500000,
+    ["La Jolly Grande"] = 30000000,
+    ["Los Primos"] = 31000000,
+    ["Bacuru and Egguru"] = 24000000,
+    ["Eviledon"] = 31500000,
+    ["Los Tacoritas"] = 32000000,
+    ["Lovin Rose"] = 32500000,
+    ["Tang Tang Kelentang"] = 33500000,
+    ["Ketupat Kepat"] = 35000000,
+    ["Los Bros"] = 37500000,
+    ["Tictac Sahur"] = 37500000,
+    ["La Romantic Grande"] = 40000000,
+    ["Gingerat Gerat"] = 40000000,
+    ["Orcaledon"] = 40000000,
+    ["Ketchuru and Masturu"] = 42500000,
+    ["Jolly Jolly Sahur"] = 45000000,
+    ["Garama and Madundung"] = 50000000,
+    ["Rosetti Tualetti"] = 50000000,
+    ["Festive 67"] = 67000000,
+    ["Love Love Bear"] = 140000000,
+    ["La Ginger Sekolah"] = 75000000,
+    ["Spooky and Pumpky"] = 80000000,
+    ["Lavadorito Spinito"] = 45000000,
+    ["Los Spaghettis"] = 70000000,
+    ["La Casa Boo"] = 100000000,
+    ["Fragrama and Chocrama"] = 100000000,
+    ["La Secret Combinasion"] = 125000000,
+    ["Reinito Sleighito"] = 140000000,
+    ["Ketupat Bros"] = 145000000,
+    ["Burguro And Fryuro"] = 150000000,
+    ["Cooki and Milki"] = 155000000,
+    ["Capitano Moby"] = 160000000,
+    ["Rosey and Teddy"] = 165000000,
+    ["Popcuru and Fizzuru"] = 170000000,
+    ["Cerberus"] = 175000000,
+    ["La Supreme Combinasion"] = 200000000,
+    ["Dragon Cannelloni"] = 250000000,
+    ["Dragon Gingerini"] = 300000000,
+    ["Headless Horseman"] = 325000000,
+    ["Hydra Dragon Cannelloni"] = 350000000,
+    ["Skibidi Toilet"] = 400000000,
+    ["Meowl"] = 500000000,
+    ["Strawberry Elephant"] = 750000000
+
+}
+
 -- ══════════════════════════════════════════
 --  THEME — Pitch Black Modern
 -- ══════════════════════════════════════════
@@ -258,7 +521,8 @@ local function buildGUI()
     end
 
     local serversTab = createTab("Servers", 1)
-    local miscTab = createTab("Misc", 2)
+    local autoGrabTab = createTab("Auto Grab", 2)
+    local miscTab = createTab("Misc", 3)
 
     -- Tab separator line
     frm(win, {sz=UDim2.new(1,0,0,1), pos=UDim2.new(0,0,0,63), bg=T.BorderBright})
@@ -436,6 +700,79 @@ local function buildGUI()
     miscScroll.Visible = false
     miscScroll.Parent = win
 
+    -- ── Auto Grab Scroll Area ────────────────────────────
+local autoGrabScroll = Instance.new("ScrollingFrame")
+autoGrabScroll.Name = "AutoGrabScroll"
+autoGrabScroll.Size = UDim2.new(1,-2,1,-99)
+autoGrabScroll.Position = UDim2.new(0,1,0,99)
+autoGrabScroll.BackgroundTransparency = 1
+autoGrabScroll.BorderSizePixel = 0
+autoGrabScroll.ScrollBarThickness = 3
+autoGrabScroll.ScrollBarImageColor3 = T.BorderBright
+autoGrabScroll.CanvasSize = UDim2.new(0,0,0,0)
+autoGrabScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+autoGrabScroll.ZIndex = 1
+autoGrabScroll.Visible = false
+autoGrabScroll.Parent = win
+
+local autoGrabLayout = Instance.new("UIListLayout")
+autoGrabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+autoGrabLayout.Padding = UDim.new(0,8)
+autoGrabLayout.Parent = autoGrabScroll
+
+local autoGrabPad = Instance.new("UIPadding")
+autoGrabPad.PaddingTop = UDim.new(0,6)
+autoGrabPad.PaddingBottom = UDim.new(0,6)
+autoGrabPad.PaddingLeft = UDim.new(0,6)
+autoGrabPad.PaddingRight = UDim.new(0,6)
+autoGrabPad.Parent = autoGrabScroll
+
+-- Auto Grab Card
+local autoGrabCard = Instance.new("Frame")
+autoGrabCard.Size = UDim2.new(1,0,0,120)
+autoGrabCard.BackgroundColor3 = T.Panel
+autoGrabCard.BorderSizePixel = 0
+autoGrabCard.LayoutOrder = 1
+autoGrabCard.Parent = autoGrabScroll
+corner(autoGrabCard, 6)
+stroke(autoGrabCard, T.Border, 1, 0)
+
+lbl(autoGrabCard, {
+    text="Auto Grab Settings",
+    size=12, color=T.Text, font=Enum.Font.Code,
+    sz=UDim2.new(1,-16,0,20), pos=UDim2.new(0,10,0,8),
+    align=Enum.TextXAlignment.Left
+})
+
+-- Toggle function
+local function createToggle(parent, text, yPos, order)
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(1,-20,0,32)
+    toggle.Position = UDim2.new(0,10,0,yPos)
+    toggle.BackgroundColor3 = T.Card
+    toggle.Text = ""
+    toggle.BorderSizePixel = 0
+    toggle.AutoButtonColor = false
+    toggle.Parent = parent
+    corner(toggle, 4)
+    stroke(toggle, T.Border, 1, 0)
+    
+    local indicator = frm(toggle, {sz=UDim2.new(0,20,0,20), pos=UDim2.new(0,8,0,6), bg=T.Bg})
+    corner(indicator, 4)
+    stroke(indicator, T.Border, 1, 0)
+    
+    lbl(toggle, {
+        text=text, size=11, color=T.Text, font=Enum.Font.Code,
+        sz=UDim2.new(1,-40,1,0), pos=UDim2.new(0,36,0,0),
+        align=Enum.TextXAlignment.Left
+    })
+    
+    return toggle, indicator
+end
+
+local nearestToggle, nearestIndicator = createToggle(autoGrabCard, "Auto Grab Nearest", 36, 1)
+local highestToggle, highestIndicator = createToggle(autoGrabCard, "Auto Grab Highest Value", 76, 2)
+
     local miscLayout = Instance.new("UIListLayout")
     miscLayout.SortOrder = Enum.SortOrder.LayoutOrder
     miscLayout.Padding = UDim.new(0,8)
@@ -558,22 +895,35 @@ local function buildGUI()
 
     -- Tab switching logic
     local function switchTab(tabName)
-        if tabName == "Servers" then
-            serversScroll.Visible = true
-            miscScroll.Visible = false
-            serversTab.BackgroundColor3 = T.Bg
-            serversTab.TextColor3 = T.Text
-            miscTab.BackgroundColor3 = T.Card
-            miscTab.TextColor3 = T.TextDim
-        else
-            serversScroll.Visible = false
-            miscScroll.Visible = true
-            serversTab.BackgroundColor3 = T.Card
-            serversTab.TextColor3 = T.TextDim
-            miscTab.BackgroundColor3 = T.Bg
-            miscTab.TextColor3 = T.Text
-        end
+    serversScroll.Visible = false
+    autoGrabScroll.Visible = false
+    miscScroll.Visible = false
+    
+    serversTab.BackgroundColor3 = T.Card
+    serversTab.TextColor3 = T.TextDim
+    autoGrabTab.BackgroundColor3 = T.Card
+    autoGrabTab.TextColor3 = T.TextDim
+    miscTab.BackgroundColor3 = T.Card
+    miscTab.TextColor3 = T.TextDim
+    
+    if tabName == "Servers" then
+        serversScroll.Visible = true
+        serversTab.BackgroundColor3 = T.Bg
+        serversTab.TextColor3 = T.Text
+    elseif tabName == "Auto Grab" then
+        autoGrabScroll.Visible = true
+        autoGrabTab.BackgroundColor3 = T.Bg
+        autoGrabTab.TextColor3 = T.Text
+    else
+        miscScroll.Visible = true
+        miscTab.BackgroundColor3 = T.Bg
+        miscTab.TextColor3 = T.Text
     end
+end
+
+serversTab.MouseButton1Click:Connect(function() switchTab("Servers") end)
+autoGrabTab.MouseButton1Click:Connect(function() switchTab("Auto Grab") end)
+miscTab.MouseButton1Click:Connect(function() switchTab("Misc") end)
 
     serversTab.MouseButton1Click:Connect(function() switchTab("Servers") end)
     miscTab.MouseButton1Click:Connect(function() switchTab("Misc") end)
@@ -601,14 +951,15 @@ local function buildGUI()
 
     sg.Parent = CoreGui
 
-                return {
-        gui=sg, win=win, titleBar=titleBar, serversScroll=serversScroll, miscScroll=miscScroll,
-        statusLbl=statusLbl, totalLbl=totalLbl, serverLbl=serverLbl,
-        closeBtn=closeBtn, minimizeBtn=minimizeBtn, resyncBtn=resyncBtn,
-        statusBar=statusBar, statusBarLbl=statusBarLbl,
-        serversTab=serversTab, miscTab=miscTab,
-        jobIdInput=jobIdInput, joinBtn=joinBtn,
-    }
+               return {
+    gui=sg, win=win, titleBar=titleBar, 
+    serversScroll=serversScroll, autoGrabScroll=autoGrabScroll, miscScroll=miscScroll,
+    statusLbl=statusLbl, totalLbl=totalLbl, serverLbl=serverLbl,
+    closeBtn=closeBtn, minimizeBtn=minimizeBtn, resyncBtn=resyncBtn,
+    statusBar=statusBar, statusBarLbl=statusBarLbl,
+    serversTab=serversTab, autoGrabTab=autoGrabTab, miscTab=miscTab,
+    jobIdInput=jobIdInput, joinBtn=joinBtn,
+}
 end
 
 -- ══════════════════════════════════════════
@@ -1060,6 +1411,124 @@ local function main()
             end
         end
     end)
+
+    -- Auto Grab System
+local autoGrabMode = nil -- "nearest" or "highest"
+local autoGrabThread = nil
+
+local function findStealablePrompts()
+    local prompts = {}
+    local plotsFolder = workspace:FindFirstChild("Plots")
+    if not plotsFolder then return prompts end
+    
+    for _, obj in ipairs(plotsFolder:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            local actionText = obj.ActionText or ""
+            local objectText = obj.ObjectText or ""
+            
+            if (actionText:match("Steal") or actionText:match("Grab")) and objectText ~= "" then
+                local parent = obj.Parent
+                if parent and parent:IsA("Attachment") then
+                    local spawnPart = parent.Parent
+                    if spawnPart and spawnPart:IsA("BasePart") then
+                        table.insert(prompts, {
+                            prompt = obj,
+                            position = spawnPart.Position,
+                            name = objectText,
+                            income = incomeByName[objectText] or 0
+                        })
+                    end
+                end
+            end
+        end
+    end
+    return prompts
+end
+
+local function startAutoGrab(mode)
+    if autoGrabThread then
+        task.cancel(autoGrabThread)
+    end
+    
+    autoGrabMode = mode
+    local player = Players.LocalPlayer
+    
+    autoGrabThread = task.spawn(function()
+        while autoGrabMode == mode do
+            task.wait(0.3)
+            
+            local character = player.Character
+            if not character then continue end
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if not hrp then continue end
+            
+            local prompts = findStealablePrompts()
+            if #prompts == 0 then continue end
+            
+            local target = nil
+            
+            if mode == "nearest" then
+                local shortestDist = math.huge
+                for _, p in ipairs(prompts) do
+                    local dist = (p.position - hrp.Position).Magnitude
+                    if dist < 30 and dist < shortestDist then
+                        shortestDist = dist
+                        target = p
+                    end
+                end
+            elseif mode == "highest" then
+                local highestIncome = 0
+                for _, p in ipairs(prompts) do
+                    local dist = (p.position - hrp.Position).Magnitude
+                    if dist < 30 and p.income > highestIncome then
+                        highestIncome = p.income
+                        target = p
+                    end
+                end
+            end
+            
+            if target then
+                pcall(function()
+                    fireproximityprompt(target.prompt)
+                end)
+            end
+        end
+    end)
+end
+
+
+--autoGrabTab
+local function stopAutoGrab()
+    if autoGrabThread then
+        task.cancel(autoGrabThread)
+        autoGrabThread = nil
+    end
+    autoGrabMode = nil
+end
+
+nearestToggle.MouseButton1Click:Connect(function()
+    if autoGrabMode == "nearest" then
+        stopAutoGrab()
+        nearestIndicator.BackgroundColor3 = T.Bg
+    else
+        stopAutoGrab()
+        startAutoGrab("nearest")
+        nearestIndicator.BackgroundColor3 = T.Green
+        highestIndicator.BackgroundColor3 = T.Bg
+    end
+end)
+
+highestToggle.MouseButton1Click:Connect(function()
+    if autoGrabMode == "highest" then
+        stopAutoGrab()
+        highestIndicator.BackgroundColor3 = T.Bg
+    else
+        stopAutoGrab()
+        startAutoGrab("highest")
+        highestIndicator.BackgroundColor3 = T.Green
+        nearestIndicator.BackgroundColor3 = T.Bg
+    end
+end)
 
         -- Draggable (mobile + desktop)
     local dragging, dragStart, winStart
