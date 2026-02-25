@@ -1,795 +1,1764 @@
---// BRAINROT VIEWER v3 — Compact Black Modern
---// Sleek, dense, all info retained. No fluff.
-
+--// SETTINGS
+local plotsFolder = workspace:WaitForChild("Plots")
 local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
-local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local Content = ""
 
-local GITHUB_TOKEN = getgenv().GithubToken or error("❌ Set getgenv().GithubToken first")
-local GIST_ID = getgenv().GistID or error("❌ Set getgenv().GistID first")
-local GIST_FILENAME = "brainrot_server.json"
-local REFRESH_INTERVAL = 0.5
-local USE_MOCK_DATA = false
-local lastKnownTimestamp = 0
+local WEBHOOK_NORMAL = getgenv().Webhook or error("❌ Webhook not set! Set getgenv().Webhook first")
+local WEBHOOK_PING = getgenv().WebhookPing or error("❌ WebhookPing not set!")
 
--- ══════════════════════════════════════════
---  THEME — Pitch Black Modern
--- ══════════════════════════════════════════
-local T = {
-    Bg          = Color3.fromRGB(8, 8, 8),
-    Panel       = Color3.fromRGB(14, 14, 14),
-    Card        = Color3.fromRGB(20, 20, 20),
-    CardHover   = Color3.fromRGB(26, 26, 26),
-    Border      = Color3.fromRGB(32, 32, 32),
-    BorderBright= Color3.fromRGB(48, 48, 48),
-    Accent      = Color3.fromRGB(255, 255, 255),
-    AccentDim   = Color3.fromRGB(180, 180, 180),
-    AccentSub   = Color3.fromRGB(100, 100, 100),
-    Green       = Color3.fromRGB(74, 222, 128),
-    GreenDim    = Color3.fromRGB(34, 120, 60),
-    Yellow      = Color3.fromRGB(250, 204, 21),
-    Orange      = Color3.fromRGB(251, 146, 60),
-    Red         = Color3.fromRGB(248, 113, 113),
-    Purple      = Color3.fromRGB(167, 139, 250),
-    Blue        = Color3.fromRGB(96, 165, 250),
-    Cyan        = Color3.fromRGB(34, 211, 238),
-    Text        = Color3.fromRGB(240, 240, 240),
-    TextMid     = Color3.fromRGB(160, 160, 160),
-    TextDim     = Color3.fromRGB(90, 90, 90),
-    Gold        = Color3.fromRGB(251, 191, 36),
-    Transparent = Color3.fromRGB(0, 0, 0),
-}
-
-local RARITY = {
-    ["OG"]      = "rainbow",
-    ["Secret"]  = Color3.fromRGB(220, 220, 220),
-    ["God"]     = Color3.fromRGB(248, 113, 113),
-    ["Burat"]   = Color3.fromRGB(74, 222, 128),
-    ["Unknown"] = Color3.fromRGB(80, 80, 80),
-}
+-- Debug: Print credentials status
+print("[Config] Webhook:", WEBHOOK_NORMAL and "✅ Set" or "❌ Missing")
+local MIN_INCOME = 10000000
+local SEND_DELAY = 3
+local SCAN_DELAY = 1.5
+local PING_MIN = 300000000
 
 local PING_NAMES = {
-    ["Rosetti Tualetti"]=true,["Rosey and Teddy"]=true,["Los Amigos"]=true,
-    ["Smurf Cat"]=true,["John Pork"]=true,["Dragon Cannelloni"]=true,
-    ["Meowl"]=true,["Strawberry Elephant"]=true,["Ketchuru and Masturu"]=true,
-    ["Ketupat Kepat"]=true,["Tang Tang Kelentang"]=true,["La Secret Combinasion"]=true,
-    ["Los Bros"]=true,["Los Hotspotsitos"]=true,["Spaghetti Tualetti"]=true,
-    ["Garama and Madundung"]=true,["Nuclearo Dinosauro"]=true,["Los Tacoritas"]=true,
-    ["Tictac Sahur"]=true,["La Supreme Combinasion"]=true,["Los Combinasionas"]=true,
-    ["La Casa Boo"]=true,["Los Spooky Combinasionas"]=true,["Reinito Sleighito"]=true,
-    ["Sammyni Fattini"]=true,["Ketupat Bros"]=true,["Burguro And Fryuro"]=true,
-    ["Lavadorito Spinito"]=true,["Hydra Dragon Cannelloni"]=true,["Dragon Gingerini"]=true,
-    ["Cerberus"]=true,["Capitano Moby"]=true,["Headless Horseman"]=true,
+    ["Rosetti Tualetti"] = true,
+    ["Rosey and Teddy"] = true,
+    ["Los Amigos"] = true,
+    ["Smurf Cat"] = true,
+    ["John Pork"] = true,
+    ["Dragon Cannelloni"] = true,
+    ["Meowl"] = true,
+    ["Strawberry Elephant"] = true,
+    ["Fragrama and Chocrama"] = true,
+    ["Ketupat Kepat"] = true,
+    ["Tang Tang Kelentang"] = true,
+    ["La Secret Combinasion"] = true,
+    ["Los Bros"] = true,
+    ["Los Hotspotsitos"] = true,
+    ["Spaghetti Tualetti"] = true,
+    ["Tralaledon"] = true,
+    ["Ketchuru and Masturu"] = true,
+    ["Garama and Madundung"] = true,
+    ["Nuclearo Dinosauro"] = true,
+    ["Los Tacoritas"] = true,
+    ["Tictac Sahur"] = true,
+    ["La Supreme Combinasion"] = true,
+    ["Los Combinasionas"] = true,
+    ["La Casa Boo"] = true,
+    ["Los Spooky Combinasionas"] = true,
+    ["Reinito Sleighito"] = true,
+    ["Sammyni Fattini"] = true,
+    ["Ketupat Bros"] = true,
+    ["Burguro And Fryuro"] = true,
+    ["Lavadorito Spinito"] = true,
+    ["Hydra Dragon Cannelloni"] = true,
+    ["Dragon Gingerini"] = true,
+    ["Spooky and Pumpky"] = true,
+    ["Cerberus"] = true,
+    ["Popcuru and Fizzuru"] = true,
+    ["Swaggy Bros"] = true,
+    ["Orcaledon"] = true,
+    ["Eviledon"] = true,
+    ["Cooki and Milki"] = true,
+    ["Capitano Moby"] = true,
+    ["Headless Horseman"] = true,
+    ["Noo my Heart"] = true
+
 }
 
-local HIGH_INCOME_THRESHOLD = 500000000
+local globalShouldPing = false
 
--- ══════════════════════════════════════════
---  HELPERS
--- ══════════════════════════════════════════
+local brainrots = {
+-- God
+"Swaggy Bros",
+"Sammyni Fattini",
+"La Food Combinasion",
+"Los Sekolahs",
+"Smurf Cat",
+"John Pork",
+"Tim Cheese",
+"Fizzy Soda",
+"Cocofanto Elefanto",
+"Antonio",
+"Girafa Celestre",
+"Gattatino Nyanino",
+"Gattatino Neonino",
+"Chihuanini Taconini",
+"Matteo",
+"Tralalero Tralala",
+"Los Crocodillitos",
+"Tigroligre Frutonni",
+"Odin Din Din Dun",
+"Orcalero Orcala",
+"Money Money Man",
+"Alessio",
+"Unclito Samito",
+"Statutino Libertino",
+"Tipi Topi Taco",
+"Tralalita Tralala",
+"Tukanno Banana",
+"Extinct Ballerina",
+"Vampira Cappucina",
+"Espresso Signora",
+"Trenozosturzzo Turbo 3000",
+"Bulbito Bandito Traktorito",
+"Urubini Flamenguini",
+"Jacko Jack Jack",
+"Trippi Troppi Troppa Trippa",
+"Capi Taco",
+"Los Chihuaninis",
+"Gattito Tacoto",
+"Las Capuchinas",
+"Ballerino Lololo",
+"Los Tungtungtungcitos",
+"Pakrahmatmamat",
+"Ballerina Peppermintina",
+"Piccione Macchina",
+"Pakrahmatmatina",
+"Los Bombinitos",
+"Tractoro Dinosauro",
+"Brr Es Teh Patipum",
+"Cacasito Satalito",
+"Orcalita Orcala",
+"Aquanaut",
+"Tartaruga Cisterna",
+"Snailenzo",
+"Corn Corn Corn Sahur",
+"Squalanana",
+"Mummy Ambalabu",
+"Los Orcalitos",
+"Dug Dug Dug",
+"Ginger Globo",
+"Yeti Claus",
+"Crabbo Limonetta",
+"Los Tipi Tacos",
+"Tootini Shrimpini",
+"Granchiello Spiritell",
+"Frio Ninja",
+"Piccionetta Macchina",
+"Boba Panda",
+"Mastodontico Telepiedone",
+"Los Gattitos",
+"Bambu Bambu Sahur",
+"Chrismasmamat",
+"Anpali Babel",
+"Cappuccino Clownino",
+"Luv Luv Luv",
+"Bombardini Tortinii",
+"Brasilini Berimbini",
+"Belula Beluga",
+"Krupuk Pagi Pagi",
+"Skull Skull Skull",
+"Cocoa Assassino",
+"Tentacolo Tecnico",
+"Ginger Cisterna",
+"Dolphini Jetskini",
+"Pop Pop Sahur",
+"Noo La Polizia",
+"Karkerheart Luvkur",
+
+-- SECRET BRAINROTS
+"La Taco Combinasion",
+"La Vacca Saturno Saturnita",
+"Pandanini Frostini",
+"Bisonte Giuppitere",
+"Blackhole Goat",
+"Jackorilla",
+"Agarrini Ia Palini",
+"Chachechi",
+"Karkerkar Kurkur",
+"Los Tortus",
+"Los Matteos",
+"Sammyni Spyderini",
+"Trenostruzzo Turbo 4000",
+"Chimpanzini Spiderini",
+"Boatito Auratito",
+"Fragola La La La",
+"Dul Dul Dul",
+"La Vacca Prese Presente",
+"Frankentteo",
+"Los Trios",
+"Karker Sahur",
+"Torrtuginni Dragonfrutini",
+"Los Tralaleritos",
+"Zombie Tralala",
+"La Cucaracha",
+"Vulturino Skeletono",
+"Guerriro Digitale",
+"Extinct Tralalero",
+"Yess My Examine",
+"Extinct Matteo",
+"Las Tralaleritas",
+"Rocco Disco",
+"Reindeer Tralala",
+"Las Vaquitas Saturnitas",
+"Pumpkin Spyderini",
+"Job Job Job Sahur",
+"Los Karkeritos",
+"Graipuss Medussi",
+"Santteo",
+"La Vacca Jacko Linterino",
+"Triplito Tralaleritos",
+"Trickolino",
+"Giftini Spyderini",
+"Los Spyderinis",
+"Love Love Love Sahur",
+"Perrito Burrito",
+"1x1x1x1",
+"Los Cucarachas",
+"Please My Present",
+"Cuadramat and Pakrahmatmamat",
+"Los Jobcitos",
+"Nooo My Hotspot",
+"Pot Hotspot",
+"Noo My Examine",
+"Telemorte",
+"La Sahur Combinasion",
+"List List List Sahur",
+"To To To Sahur",
+"Pirulitoita Bicicletaire",
+"25",
+"Santa Hotspot",
+"Horegini Boom",
+"Quesadilla Crocodila",
+"Pot Pumpkin",
+"Naughty Naughty",
+"Cupid Cupid Sahur",
+"Ho Ho Ho Sahur",
+"Mi Gatito",
+"Chicleteira Bicicleteira",
+"Cupid Hotspot",
+"Spaghetti Tualetti",
+"Esok Sekolah",
+"Quesadillo Vampiro",
+"Brunito Marsito",
+"Chill Puppy",
+"Burrito Bandito",
+"Chicleteirina Bicicleteirina",
+"Los Quesadillas",
+"Bunito Bunito Spinito",
+"Noo My Candy",
+"Los Nooo My Hotspotsitos",
+"La Grande Combinassion",
+"Rang Ring Bus",
+"Guest 666",
+"Los Mi Gatitos",
+"Los Chicleteiras",
+"67",
+"Donkeyturbo Express",
+"Mariachi Corazoni",
+"Los Burritos",
+"Los 25",
+"Swag Soda",
+"Noo my Heart",
+"Chimnino",
+"Los Combinasionas",
+"Chicleteira Noelteira",
+"Fishino Clownino",
+"Tacorita Bicicleta",
+"Spinny Hammy",
+"Nuclearo Dinosauro",
+"Las Sis",
+"Chicleteira Cupideira",
+"La Karkerkar Combinasion",
+"Chillin Chili",
+"Chipso and Queso",
+"Money Money Reindeer",
+"Money Money Puggy",
+"Celularcini Viciosini",
+"Los Planitos",
+"Los Mobilis",
+"Los 67",
+"Mieteteira Bicicleteira",
+"Tuff Toucan",
+"La Spooky Grande",
+"Los Spooky Combinasionas",
+"Los Candies",
+"Los Hotspositos",
+"Los Jolly Combinasionas",
+"Los Puggies",
+"W or L",
+"Tralalalaledon",
+"La Extinct Grande",
+"Tralaledon",
+"La Jolly Grande",
+"Los Primos",
+"Bacuru and Egguru",
+"Eviledon",
+"Los Tacoritas",
+"Lovin Rose",
+"Tang Tang Kelentang",
+"Ketupat Kepat",
+"Los Bros",
+"Tictac Sahur",
+"La Romantic Grande",
+"Gingerat Gerat",
+"Orcaledon",
+"Ketchuru and Masturu",
+"Jolly Jolly Sahur",
+"Garama and Madundung",
+"Rosetti Tualetti",
+"Festive 67",
+"Love Love Bear",
+"La Ginger Sekolah",
+"Spooky and Pumpky",
+"Lavadorito Spinito",
+"Los Spaghettis",
+"La Casa Boo",
+"Fragrama and Chocrama",
+"La Secret Combinasion",
+"Reinito Sleighito",
+"Ketupat Bros",
+"Burguro And Fryuro",
+"Cooki and Milki",
+"Capitano Moby",
+"Rosey and Teddy",
+"Popcuru and Fizzuru",
+"Cerberus",
+"La Supreme Combinasion",
+"Dragon Cannelloni",
+"Dragon Gingerini",
+"Headless Horseman",
+"Hydra Dragon Cannelloni",
+
+-- OGS
+
+"Skibidi Toilet",
+"Meowl",
+"Strawberry Elephant",
+
+
+}
+
+local RARITY_COLOR = {
+    ["God"] = 0xFFD166,
+    ["Secret"] = 0xEF476F,
+    ["OG"] = 0x118AB2,
+    ["Burat"] = 0x06D6A0,
+    ["Unknown"] = 0x9E9E9E
+}
+
+local RARITY_ORDER = {
+    ["OG"] = 5,
+    ["Secret"] = 4,
+    ["God"] = 3,
+    ["Burat"] = 2,
+    ["Unknown"] = 1
+}
+
+local rarityByName = {
+
+    ["Swaggy Bros"] = "Secret",
+    ["Los Amigos"] = "Secret",
+    ["Sammyni Fattini"] = "Secret",
+    ["Los Sekolahs"] = "Secret",
+    ["La Food Combinasion"] = "Secret",
+    
+
+    --GOD
+    ["Tim Cheese"] = "Burat",
+    ["Fizzy Soda"] = "God",
+    ["Cocofanto Elefanto"] = "God",
+    ["Antonio"] = "God",
+    ["Girafa Celestre"] = "God",
+    ["Gattatino Nyanino"] = "God",
+    ["Gattatino Neonino"] = "God",
+    ["Chihuanini Taconini"] = "God",
+    ["Matteo"] = "God",
+    ["Tralalero Tralala"] = "God",
+    ["Los Crocodillitos"] = "God",
+    ["Tigroligre Frutonni"] = "God",
+    ["Odin Din Din Dun"] = "God",
+    ["Orcalero Orcala"] = "God",
+    ["Money Money Man"] = "God",
+    ["Alessio"] = "God",
+    ["Unclito Samito"] = "God",
+    ["Statutino Libertino"] = "God",
+    ["Tipi Topi Taco"] = "God",
+    ["Tralalita Tralala"] = "God",
+    ["Tukanno Banana"] = "God",
+    ["Extinct Ballerina"] = "God",
+    ["Vampira Cappucina"] = "God",
+    ["Espresso Signora"] = "God",
+    ["Trenozosturzzo Turbo 3000"] = "God",
+    ["Bulbito Bandito Traktorito"] = "God",
+    ["Urubini Flamenguini"] = "God",
+    ["Jacko Jack Jack"] = "God",
+    ["Trippi Troppi Troppa Trippa"] = "God",
+    ["Capi Taco"] = "God",
+    ["Los Chihuaninis"] = "God",
+    ["Gattito Tacoto"] = "God",
+    ["Las Capuchinas"] = "God",
+    ["Ballerino Lololo"] = "God",
+    ["Los Tungtungtungcitos"] = "God",
+    ["Pakrahmatmamat"] = "God",
+    ["Ballerina Peppermintina"] = "God",
+    ["Piccione Macchina"] = "God",
+    ["Pakrahmatmatina"] = "God",
+    ["Los Bombinitos"] = "God",
+    ["Tractoro Dinosauro"] = "God",
+    ["Brr Es Teh Patipum"] = "God",
+    ["Cacasito Satalito"] = "God",
+    ["Orcalita Orcala"] = "God",
+    ["Aquanaut"] = "God",
+    ["Tartaruga Cisterna"] = "God",
+    ["Snailenzo"] = "God",
+    ["Corn Corn Corn Sahur"] = "God",
+    ["Squalanana"] = "God",
+    ["Mummy Ambalabu"] = "God",
+    ["Los Orcalitos"] = "God",
+    ["Dug Dug Dug"] = "God",
+    ["Ginger Globo"] = "God",
+    ["Yeti Claus"] = "God",
+    ["Crabbo Limonetta"] = "God",
+    ["Los Tipi Tacos"] = "God",
+    ["Tootini Shrimpini"] = "God",
+    ["Granchiello Spiritell"] = "God",
+    ["Frio Ninja"] = "God",
+    ["Piccionetta Macchina"] = "God",
+    ["Boba Panda"] = "God",
+    ["Mastodontico Telepiedone"] = "God",
+    ["Los Gattitos"] = "God",
+    ["Bambu Bambu Sahur"] = "God",
+    ["Chrismasmamat"] = "God",
+    ["Anpali Babel"] = "God",
+    ["Cappuccino Clownino"] = "God",
+    ["Luv Luv Luv"] = "God",
+    ["Bombardini Tortinii"] = "God",
+    ["Brasilini Berimbini"] = "God",
+    ["Belula Beluga"] = "God",
+    ["Krupuk Pagi Pagi"] = "God",
+    ["Skull Skull Skull"] = "God",
+    ["Cocoa Assassino"] = "God",
+    ["Tentacolo Tecnico"] = "God",
+    ["Ginger Cisterna"] = "God",
+    ["Dolphini Jetskini"] = "God",
+    ["Pop Pop Sahur"] = "God",
+    ["Noo La Polizia"] = "God",
+    ["Karkerheart Luvkur"] = "God",
+
+    --SECRET
+    ["La Taco Combinasion"] = "Secret",
+    ["La Vacca Saturno Saturnita"] = "Secret",
+    ["Pandanini Frostini"] = "Secret",
+    ["Bisonte Giuppitere"] = "Secret",
+    ["Blackhole Goat"] = "Secret",
+    ["Jackorilla"] = "Secret",
+    ["Agarrini Ia Palini"] = "Secret",
+    ["Chachechi"] = "Secret",
+    ["Karkerkar Kurkur"] = "Secret",
+    ["Los Tortus"] = "Secret",
+    ["Los Matteos"] = "Secret",
+    ["Sammyni Spyderini"] = "Secret",
+    ["Trenostruzzo Turbo 4000"] = "Secret",
+    ["Chimpanzini Spiderini"] = "Secret",
+    ["Boatito Auratito"] = "Secret",
+    ["Fragola La La La"] = "Secret",
+    ["Dul Dul Dul"] = "Secret",
+    ["La Vacca Prese Presente"] = "Secret",
+    ["Frankentteo"] = "Secret",
+    ["Los Trios"] = "Secret",
+    ["Karker Sahur"] = "Secret",
+    ["Torrtuginni Dragonfrutini"] = "Secret",
+    ["Los Tralaleritos"] = "Secret",
+    ["Zombie Tralala"] = "Secret",
+    ["La Cucaracha"] = "Secret",
+    ["Vulturino Skeletono"] = "Secret",
+    ["Guerriro Digitale"] = "Secret",
+    ["Extinct Tralalero"] = "Secret",
+    ["Yess My Examine"] = "Secret",
+    ["Extinct Matteo"] = "Secret",
+    ["Las Tralaleritas"] = "Secret",
+    ["Rocco Disco"] = "Secret",
+    ["Reindeer Tralala"] = "Secret",
+    ["Las Vaquitas Saturnitas"] = "Secret",
+    ["Pumpkin Spyderini"] = "Secret",
+    ["Job Job Job Sahur"] = "Secret",
+    ["Los Karkeritos"] = "Secret",
+    ["Graipuss Medussi"] = "Secret",
+    ["Santteo"] = "Secret",
+    ["La Vacca Jacko Linterino"] = "Secret",
+    ["Triplito Tralaleritos"] = "Secret",
+    ["Trickolino"] = "Secret",
+    ["Giftini Spyderini"] = "Secret",
+    ["Los Spyderinis"] = "Secret",
+    ["Love Love Love Sahur"] = "Secret",
+    ["Perrito Burrito"] = "Secret",
+    ["1x1x1x1"] = "Secret",
+    ["Los Cucarachas"] = "Secret",
+    ["Please My Present"] = "Secret",
+    ["Cuadramat and Pakrahmatmamat"] = "Secret",
+    ["Los Jobcitos"] = "Secret",
+    ["Nooo My Hotspot"] = "Secret",
+    ["Pot Hotspot"] = "Secret",
+    ["Noo My Examine"] = "Secret",
+    ["Telemorte"] = "Secret",
+    ["La Sahur Combinasion"] = "Secret",
+    ["List List List Sahur"] = "Secret",
+    ["To To To Sahur"] = "Secret",
+    ["Pirulitoita Bicicletaire"] = "Secret",
+    ["25"] = "Secret",
+    ["Santa Hotspot"] = "Secret",
+    ["Horegini Boom"] = "Secret",
+    ["Quesadilla Crocodila"] = "Secret",
+    ["Pot Pumpkin"] = "Secret",
+    ["Naughty Naughty"] = "Secret",
+    ["Cupid Cupid Sahur"] = "Secret",
+    ["Ho Ho Ho Sahur"] = "Secret",
+    ["Mi Gatito"] = "Secret",
+    ["Chicleteira Bicicleteira"] = "Secret",
+    ["Cupid Hotspot"] = "Secret",
+    ["Spaghetti Tualetti"] = "Secret",
+    ["Esok Sekolah"] = "Secret",
+    ["Quesadillo Vampiro"] = "Secret",
+    ["Brunito Marsito"] = "Secret",
+    ["Chill Puppy"] = "Secret",
+    ["Burrito Bandito"] = "Secret",
+    ["Chicleteirina Bicicleteirina"] = "Secret",
+    ["Los Quesadillas"] = "Secret",
+    ["Bunito Bunito Spinito"] = "Secret",
+    ["Noo My Candy"] = "Secret",
+    ["Los Nooo My Hotspotsitos"] = "Secret",
+    ["La Grande Combinassion"] = "Secret",
+    ["Rang Ring Bus"] = "Secret",
+    ["Guest 666"] = "Secret",
+    ["Los Mi Gatitos"] = "Secret",
+    ["Los Chicleteiras"] = "Secret",
+    ["67"] = "Secret",
+    ["Donkeyturbo Express"] = "Secret",
+    ["Mariachi Corazoni"] = "Secret",
+    ["Los Burritos"] = "Secret",
+    ["Los 25"] = "Secret",
+    ["Swag Soda"] = "Secret",
+    ["Noo my Heart"] = "Secret",
+    ["Chimnino"] = "Secret",
+    ["Los Combinasionas"] = "Secret",
+    ["Chicleteira Noelteira"] = "Secret",
+    ["Fishino Clownino"] = "Secret",
+    ["Tacorita Bicicleta"] = "Secret",
+    ["Spinny Hammy"] = "Secret",
+    ["Nuclearo Dinosauro"] = "Secret",
+    ["Las Sis"] = "Secret",
+    ["Chicleteira Cupideira"] = "Secret",
+    ["La Karkerkar Combinasion"] = "Secret",
+    ["Chillin Chili"] = "Secret",
+    ["Chipso and Queso"] = "Secret",
+    ["Money Money Reindeer"] = "Secret",
+    ["Money Money Puggy"] = "Secret",
+    ["Celularcini Viciosini"] = "Secret",
+    ["Los Planitos"] = "Secret",
+    ["Los Mobilis"] = "Secret",
+    ["Los 67"] = "Secret",
+    ["Mieteteira Bicicleteira"] = "Secret",
+    ["Tuff Toucan"] = "Secret",
+    ["La Spooky Grande"] = "Secret",
+    ["Los Spooky Combinasionas"] = "Secret",
+    ["Los Candies"] = "Secret",
+    ["Los Hotspositos"] = "Secret",
+    ["Los Jolly Combinasionas"] = "Secret",
+    ["Los Puggies"] = "Secret",
+    ["W or L"] = "Secret",
+    ["Tralalalaledon"] = "Secret",
+    ["La Extinct Grande"] = "Secret",
+    ["Tralaledon"] = "Secret",
+    ["La Jolly Grande"] = "Secret",
+    ["Los Primos"] = "Secret",
+    ["Bacuru and Egguru"] = "Secret",
+    ["Eviledon"] = "Secret",
+    ["Los Tacoritas"] = "Secret",
+    ["Lovin Rose"] = "Secret",
+    ["Tang Tang Kelentang"] = "Secret",
+    ["Ketupat Kepat"] = "Secret",
+    ["Los Bros"] = "Secret",
+    ["Tictac Sahur"] = "Secret",
+    ["La Romantic Grande"] = "Secret",
+    ["Gingerat Gerat"] = "Secret",
+    ["Orcaledon"] = "Secret",
+    ["Ketchuru and Masturu"] = "Secret",
+    ["Jolly Jolly Sahur"] = "Secret",
+    ["Garama and Madundung"] = "Secret",
+    ["Rosetti Tualetti"] = "Secret",
+    ["Festive 67"] = "Secret",
+    ["Love Love Bear"] = "Secret",
+    ["La Ginger Sekolah"] = "Secret",
+    ["Spooky and Pumpky"] = "Secret",
+    ["Lavadorito Spinito"] = "Secret",
+    ["Los Spaghettis"] = "Secret",
+    ["La Casa Boo"] = "Secret",
+    ["Fragrama and Chocrama"] = "Secret",
+    ["La Secret Combinasion"] = "Secret",
+    ["Reinito Sleighito"] = "Secret",
+    ["Ketupat Bros"] = "Secret",
+    ["Burguro And Fryuro"] = "Secret",
+    ["Cooki and Milki"] = "Secret",
+    ["Capitano Moby"] = "Secret",
+    ["Rosey and Teddy"] = "Secret",
+    ["Popcuru and Fizzuru"] = "Secret",
+    ["Cerberus"] = "Secret",
+    ["La Supreme Combinasion"] = "Secret",
+    ["Dragon Cannelloni"] = "Secret",
+    ["Dragon Gingerini"] = "Secret",
+    ["Headless Horseman"] = "Secret",
+    ["Hydra Dragon Cannelloni"] = "Secret",
+
+    ["Skibidi Toilet"] = "OG",
+    ["Meowl"] = "OG",
+    ["Strawberry Elephant"] = "OG"
+
+}
+local costByName = {
+
+    ["Swaggy Bros"] = 7000000000,
+    ["Los Amigos"] = 55000000000,
+    ["Sammyni Fattini"] = 20000000000,
+    ["La Food Combinasion"] = 30000000,
+    ["Los Sekolahs"] = 45000000000,
+    --og
+    ["Smurf Cat"] = 999999999999,
+    ["John Pork"] = 999999999999,
+
+    
+    --GOD
+    ["Tim Cheese"] = 500,
+    ["Fizzy Soda"] = 4900000,
+    ["Cocofanto Elefanto"] = 5000000,
+    ["Antonio"] = 6000000,
+    ["Girafa Celestre"] = 7500000,
+    ["Gattatino Nyanino"] = 7500000,
+    ["Gattatino Neonino"] = 7500000,
+    ["Chihuanini Taconini"] = 8500000,
+    ["Matteo"] = 10000000,
+    ["Tralalero Tralala"] = 10000000,
+    ["Los Crocodillitos"] = 12500000,
+    ["Tigroligre Frutonni"] = 15000000,
+    ["Boatito Auratito"] = 525000,
+    ["Odin Din Din Dun"] = 15000000,
+    ["Orcalero Orcala"] = 15000000,
+    ["Money Money Man"] = 17500000,
+    ["Alessio"] = 17500000,
+    ["Unclito Samito"] = 20000000,
+    ["Statutino Libertino"] = 20000000,
+    ["Tipi Topi Taco"] = 20000000,
+    ["Tralalita Tralala"] = 20000000,
+    ["Tukanno Banana"] = 22500000,
+    ["Extinct Ballerina"] = 23500000,
+    ["Vampira Cappucina"] = 24500000,
+    ["Espresso Signora"] = 25000000,
+    ["Trenozosturzzo Turbo 3000"] = 25000000,
+    ["Bulbito Bandito Traktorito"] = 25000000,
+    ["Urubini Flamenguini"] = 30000000,
+    ["Jacko Jack Jack"] = 30000000,
+    ["Trippi Troppi Troppa Trippa"] = 30000000,
+    ["Capi Taco"] = 31000000,
+    ["Los Chihuaninis"] = 32000000,
+    ["Gattito Tacoto"] = 32500000,
+    ["Las Capuchinas"] = 32500000,
+    ["Ballerino Lololo"] = 35000000,
+    ["Los Tungtungtungcitos"] = 37500000,
+    ["Pakrahmatmamat"] = 37500000,
+    ["Ballerina Peppermintina"] = 37500000,
+    ["Piccione Macchina"] = 40000000,
+    ["Pakrahmatmatina"] = 40500000,
+    ["Los Bombinitos"] = 42500000,
+    ["Tractoro Dinosauro"] = 42500000,
+    ["Brr Es Teh Patipum"] = 45000000,
+    ["Cacasito Satalito"] = 45000000,
+    ["Orcalita Orcala"] = 45000000,
+    ["Aquanaut"] = 45500000,
+    ["Tartaruga Cisterna"] = 45000000,
+    ["Snailenzo"] = 45000000,
+    ["Corn Corn Corn Sahur"] = 45000000,
+    ["Squalanana"] = 45000000,
+    ["Mummy Ambalabu"] = 45000000,
+    ["Los Orcalitos"] = 45000000,
+    ["Dug Dug Dug"] = 45500000,
+    ["Ginger Globo"] = 45700000,
+    ["Yeti Claus"] = 45700000,
+    ["Crabbo Limonetta"] = 46000000,
+    ["Los Tipi Tacos"] = 46000000,
+    ["Tootini Shrimpini"] = 46000000,
+    ["Granchiello Spiritell"] = 46000000,
+    ["Frio Ninja"] = 46500000,
+    ["Piccionetta Macchina"] = 47000000,
+    ["Boba Panda"] = 47000000,
+    ["Mastodontico Telepiedone"] = 47500000,
+    ["Los Gattitos"] = 47500000,
+    ["Bambu Bambu Sahur"] = 47500000,
+    ["Chrismasmamat"] = 47700000,
+    ["Anpali Babel"] = 48000000,
+    ["Cappuccino Clownino"] = 48000000,
+    ["Luv Luv Luv"] = 48300000,
+    ["Bombardini Tortinii"] = 50000000,
+    ["Brasilini Berimbini"] = 55500000,
+    ["Belula Beluga"] = 60000000,
+    ["Krupuk Pagi Pagi"] = 60000000,
+    ["Skull Skull Skull"] = 60000000,
+    ["Cocoa Assassino"] = 60000000,
+    ["Tentacolo Tecnico"] = 62500000,
+    ["Ginger Cisterna"] = 63500000,
+    ["Dolphini Jetskini"] = 64500000,
+    ["Pop Pop Sahur"] = 65000000,
+    ["Noo La Polizia"] = 67000000,
+    ["Karkerheart Luvkur"] = 67500000,
+
+    --SECRET
+
+    ["La Taco Combinasion"] = 5000000000,
+    ["La Vacca Saturno Saturnita"] = 50000000,
+    ["Pandanini Frostini"] = 64000000,
+    ["Bisonte Giuppitere"] = 75000000,
+    ["Blackhole Goat"] = 75000000,
+    ["Jackorilla"] = 80000000,
+    ["Agarrini Ia Palini"] = 80000000,
+    ["Chachechi"] = 85000000,
+
+    ["Karkerkar Kurkur"] = 100000000,
+    ["Los Tortus"] = 100000000,
+    ["Los Matteos"] = 100000000,
+    ["Sammyni Spyderini"] = 100000000,
+    ["Trenostruzzo Turbo 4000"] = 100000000,
+    ["Chimpanzini Spiderini"] = 100000000,
+    ["Los Tralaleritos"] = 100000000,
+    ["Zombie Tralala"] = 100000000,
+
+    ["La Cucaracha"] = 110000000,
+    ["Vulturino Skeletono"] = 110000000,
+
+    ["Guerriro Digitale"] = 120000000,
+
+    ["Fragola La La La"] = 125000000,
+    ["Extinct Tralalero"] = 125000000,
+
+    ["Yess My Examine"] = 130000000,
+
+    ["Extinct Matteo"] = 140000000,
+
+    ["Dul Dul Dul"] = 150000000,
+    ["Las Tralaleritas"] = 150000000,
+    ["Rocco Disco"] = 150000000,
+
+    ["La Vacca Prese Presente"] = 160000000,
+    ["Reindeer Tralala"] = 160000000,
+    ["Las Vaquitas Saturnitas"] = 160000000,
+
+    ["Pumpkin Spyderini"] = 165000000,
+
+    ["Frankentteo"] = 175000000,
+    ["Los Trios"] = 175000000,
+    ["Job Job Job Sahur"] = 175000000,
+
+    ["Karker Sahur"] = 185000000,
+
+    ["Los Karkeritos"] = 200000000,
+    ["Graipuss Medussi"] = 200000000,
+
+    ["Santteo"] = 210000000,
+
+    ["La Vacca Jacko Linterino"] = 225000000,
+
+    ["Triplito Tralaleritos"] = 230000000,
+
+    ["Trickolino"] = 235000000,
+
+    ["Giftini Spyderini"] = 240000000,
+
+    ["Los Spyderinis"] = 250000000,
+    ["Love Love Love Sahur"] = 250000000,
+    ["Perrito Burrito"] = 250000000,
+
+    ["1x1x1x1"] = 255500000,
+
+    ["Los Cucarachas"] = 300000000,
+    ["Please My Present"] = 350000000,
+    ["Cuadramat and Pakrahmatmamat"] = 400000000,
+
+    ["Los Jobcitos"] = 500000000,
+    ["Torrtuginni Dragonfrutini"] = 500000000,
+    ["Nooo My Hotspot"] = 500000000,
+    ["Pot Hotspot"] = 500000000,
+
+    ["Noo My Examine"] = 525000000,
+
+    ["Telemorte"] = 550000000,
+    ["La Sahur Combinasion"] = 550000000,
+    ["List List List Sahur"] = 550000000,
+
+    ["To To To Sahur"] = 575000000,
+
+    ["Pirulitoita Bicicletaire"] = 600000000,
+    ["25"] = 600000000,
+
+    ["Santa Hotspot"] = 625000000,
+
+    ["Horegini Boom"] = 650000000,
+
+    ["Quesadilla Crocodila"] = 700000000,
+    ["Pot Pumpkin"] = 700000000,
+    ["Naughty Naughty"] = 700000000,
+
+    ["Cupid Cupid Sahur"] = 715000000,
+
+    ["Ho Ho Ho Sahur"] = 725000000,
+    ["Mi Gatito"] = 725000000,
+
+    ["Chicleteira Bicicleteira"] = 750000000,
+    ["Cupid Hotspot"] = 750000000,
+    ["Spaghetti Tualetti"] = 750000000,
+    ["Esok Sekolah"] = 750000000,
+    ["Quesadillo Vampiro"] = 750000000,
+    ["Brunito Marsito"] = 750000000,
+
+    ["Chill Puppy"] = 800000000,
+    ["Burrito Bandito"] = 800000000,
+
+    ["Chicleteirina Bicicleteirina"] = 850000000,
+
+    ["Los Quesadillas"] = 875000000,
+
+    ["Bunito Bunito Spinito"] = 900000000,
+    ["Noo My Candy"] = 900000000,
+
+    ["Los Nooo My Hotspotsitos"] = 1000000000,
+    ["La Grande Combinassion"] = 1000000000,
+
+    ["Rang Ring Bus"] = 1100000000,
+    ["Guest 666"] = 1100000000,
+
+    ["Los Mi Gatitos"] = 1200000000,
+    ["Los Chicleteiras"] = 1200000000,
+    ["67"] = 1200000000,
+    ["Donkeyturbo Express"] = 1200000000,
+    ["Mariachi Corazoni"] = 1200000000,
+
+    ["Los Burritos"] = 1400000000,
+    ["Los 25"] = 1500000000,
+
+    ["Swag Soda"] = 1800000000,
+    ["Noo my Heart"] = 1800000000,
+
+    ["Chimnino"] = 1900000000,
+
+    ["Los Combinasionas"] = 2000000000,
+    ["Chicleteira Noelteira"] = 2000000000,
+
+    ["Fishino Clownino"] = 2100000000,
+
+    ["Tacorita Bicicleta"] = 2200000000,
+
+    ["Spinny Hammy"] = 2300000000,
+
+    ["Nuclearo Dinosauro"] = 2500000000,
+    ["Las Sis"] = 2500000000,
+    ["Chicleteira Cupideira"] = 2500000000,
+    ["La Karkerkar Combinasion"] = 2500000000,
+    ["Chillin Chili"] = 2500000000,
+    ["Chipso and Queso"] = 2500000000,
+    ["Money Money Reindeer"] = 2500000000,
+
+    ["Money Money Puggy"] = 2600000000,
+    ["Celularcini Viciosini"] = 2600000000,
+
+    ["Los Planitos"] = 2700000000,
+    ["Los Mobilis"] = 2700000000,
+    ["Los 67"] = 2700000000,
+    ["Mieteteira Bicicleteira"] = 2700000000,
+    ["Tuff Toucan"] = 2700000000,
+
+    ["La Spooky Grande"] = 2900000000,
+
+    ["Los Spooky Combinasionas"] = 3000000000,
+    ["Los Candies"] = 3000000000,
+    ["Los Hotspositos"] = 3000000000,
+    ["Los Jolly Combinasionas"] = 3000000000,
+    ["Los Puggies"] = 3000000000,
+    ["W or L"] = 3000000000,
+    ["Tralalalaledon"] = 3000000000,
+
+    ["La Extinct Grande"] = 3200000000,
+
+    ["Tralaledon"] = 3500000000,
+    ["La Jolly Grande"] = 3500000000,
+
+    ["Los Primos"] = 3700000000,
+
+    ["Bacuru and Egguru"] = 3800000000,
+    ["Eviledon"] = 3800000000,
+
+    ["Los Tacoritas"] = 4000000000,
+
+    ["Lovin Rose"] = 4200000000,
+
+    ["Tang Tang Kelentang"] = 4500000000,
+
+    ["Ketupat Kepat"] = 5000000000,
+
+    ["Los Bros"] = 6000000000,
+    ["Tictac Sahur"] = 6000000000,
+
+    ["La Romantic Grande"] = 7000000000,
+    ["Gingerat Gerat"] = 7000000000,
+    ["Orcaledon"] = 7000000000,
+
+    ["Ketchuru and Masturu"] = 7500000000,
+
+    ["Jolly Jolly Sahur"] = 8000000000,
+
+    ["Garama and Madundung"] = 10000000000,
+    ["Rosetti Tualetti"] = 10000000000,
+
+    ["Festive 67"] = 16000000000,
+
+    ["Love Love Bear"] = 23000000000,
+    ["La Ginger Sekolah"] = 23000000000,
+
+    ["Spooky and Pumpky"] = 25000000000,
+
+    ["Lavadorito Spinito"] = 30000000000,
+
+    ["Los Spaghettis"] = 40000000000,
+    ["La Casa Boo"] = 40000000000,
+    ["Fragrama and Chocrama"] = 40000000000,
+
+    ["La Secret Combinasion"] = 50000000000,
+
+    ["Reinito Sleighito"] = 60000000000,
+
+    ["Ketupat Bros"] = 65000000000,
+
+    ["Burguro And Fryuro"] = 75000000000,
+
+    ["Cooki and Milki"] = 100000000000,
+
+    ["Capitano Moby"] = 125000000000,
+    ["Rosey and Teddy"] = 130000000000,
+    ["Popcuru and Fizzuru"] = 135000000000,
+
+    ["Cerberus"] = 150000000000,
+
+    ["La Supreme Combinasion"] = 200000000000,
+
+    ["Dragon Cannelloni"] = 250000000000,
+    ["Dragon Gingerini"] = 300000000000,
+    ["Headless Horseman"] = 325000000000,
+    ["Hydra Dragon Cannelloni"] = 350000000000,
+
+    ["Skibidi Toilet"] = 400000000000,
+    ["Meowl"] = 500000000000,
+    ["Strawberry Elephant"] = 750000000000
+}
+local incomeByName = {
+    ["Swaggy Bros"] = 40000000,
+    ["Los Amigos"] = 130000000,
+    ["Sammyni Fattini"] = 70000000,
+    ["John Pork"] = 999999999999999,
+    ["Smurf Cat"] = 999999999999999,
+
+    ["La Food Combinasion"] = 90000000,
+    ["Los Sekolahs"] = 110000000,
+    --GOD
+    ["Tim Cheese"] = 20,
+    ["Fizzy Soda"] = 17200,
+    ["Cocofanto Elefanto"] = 10000,
+    ["Antonio"] = 18500,
+    ["Girafa Celestre"] = 20000,
+    ["Gattatino Nyanino"] = 35000,
+    ["Gattatino Neonino"] = 20000,
+    ["Chihuanini Taconini"] = 45000,
+    ["Matteo"] = 50000,
+    ["Tralalero Tralala"] = 50000,
+    ["Los Crocodillitos"] = 55000,
+    ["Tigroligre Frutonni"] = 60000,
+    ["Odin Din Din Dun"] = 75000,
+    ["Orcalero Orcala"] = 100000,
+    ["Money Money Man"] = 65000,
+    ["Alessio"] = 65000,
+    ["Unclito Samito"] = 65000,
+    ["Statutino Libertino"] = 75000,
+    ["Tipi Topi Taco"] = 75000,
+    ["Tralalita Tralala"] = 100000,
+    ["Tukanno Banana"] = 100000,
+    ["Extinct Ballerina"] = 125000,
+    ["Vampira Cappucina"] = 125000,
+    ["Espresso Signora"] = 70000,
+    ["Trenozosturzzo Turbo 3000"] = 150000,
+    ["Bulbito Bandito Traktorito"] = 205000,
+    ["Urubini Flamenguini"] = 150000,
+    ["Jacko Jack Jack"] = 150000,
+    ["Trippi Troppi Troppa Trippa"] = 175000,
+    ["Capi Taco"] = 155000,
+    ["Los Chihuaninis"] = 160000,
+    ["Gattito Tacoto"] = 165000,
+    ["Las Capuchinas"] = 185000,
+    ["Ballerino Lololo"] = 200000,
+    ["Los Tungtungtungcitos"] = 210000,
+    ["Pakrahmatmamat"] = 215000,
+    ["Ballerina Peppermintina"] = 215000,
+    ["Piccione Macchina"] = 225000,
+    ["Pakrahmatmatina"] = 225000,
+    ["Los Bombinitos"] = 220000,
+    ["Tractoro Dinosauro"] = 230000,
+    ["Brr Es Teh Patipum"] = 225000,
+    ["Cacasito Satalito"] = 240000,
+    ["Orcalita Orcala"] = 240000,
+    ["Aquanaut"] = 245000,
+    ["Tartaruga Cisterna"] = 250000,
+    ["Snailenzo"] = 250000,
+    ["Corn Corn Corn Sahur"] = 250000,
+    ["Squalanana"] = 250000,
+    ["Mummy Ambalabu"] = 250000,
+    ["Los Orcalitos"] = 310000,
+    ["Dug Dug Dug"] = 255000,
+    ["Ginger Globo"] = 257500,
+    ["Yeti Claus"] = 267500,
+    ["Crabbo Limonetta"] = 230000,
+    ["Los Tipi Tacos"] = 260000,
+    ["Tootini Shrimpini"] = 260000,
+    ["Granchiello Spiritell"] = 260000,
+    ["Frio Ninja"] = 265000,
+    ["Piccionetta Macchina"] = 270000,
+    ["Boba Panda"] = 270000,
+    ["Mastodontico Telepiedone"] = 275000,
+    ["Los Gattitos"] = 275000,
+    ["Bambu Bambu Sahur"] = 275000,
+    ["Chrismasmamat"] = 277500,
+    ["Anpali Babel"] = 280000,
+    ["Cappuccino Clownino"] = 285000,
+    ["Luv Luv Luv"] = 282000,
+    ["Bombardini Tortinii"] = 225000,
+    ["Brasilini Berimbini"] = 285000,
+    ["Belula Beluga"] = 290000,
+    ["Krupuk Pagi Pagi"] = 290000,
+    ["Skull Skull Skull"] = 290000,
+    ["Cocoa Assassino"] = 291000,
+    ["Tentacolo Tecnico"] = 295000,
+    ["Ginger Cisterna"] = 293500,
+    ["Dolphini Jetskini"] = 294500,
+    ["Pop Pop Sahur"] = 295000,
+    ["Noo La Polizia"] = 280000,
+    ["Karkerheart Luvkur"] = 297500,
+
+    --SECRET
+    ["La Taco Combinasion"] = 35000000,
+    ["La Vacca Saturno Saturnita"] = 300000,
+    ["Pandanini Frostini"] = 294000,
+    ["Bisonte Giuppitere"] = 300000,
+    ["Blackhole Goat"] = 400000,
+    ["Jackorilla"] = 315000,
+    ["Agarrini Ia Palini"] = 425000,
+    ["Chachechi"] = 400000,
+    ["Karkerkar Kurkur"] = 275000,
+    ["Los Tortus"] = 500000,
+    ["Los Matteos"] = 300000,
+    ["Sammyni Spyderini"] = 300000,
+    ["Trenostruzzo Turbo 4000"] = 310000,
+    ["Chimpanzini Spiderini"] = 325000,
+    ["Boatito Auratito"] = 525000,
+    ["Fragola La La La"] = 450000,
+    ["Dul Dul Dul"] = 375000,
+    ["La Vacca Prese Presente"] = 600000,
+    ["Frankentteo"] = 700000,
+    ["Los Trios"] = 700000,
+    ["Karker Sahur"] = 725000,
+    ["Torrtuginni Dragonfrutini"] = 350000,
+    ["Los Tralaleritos"] = 500000,
+    ["Zombie Tralala"] = 500000,
+    ["La Cucaracha"] = 475000,
+    ["Vulturino Skeletono"] = 500000,
+    ["Guerriro Digitale"] = 550000,
+    ["Extinct Tralalero"] = 450000,
+    ["Yess My Examine"] = 575000,
+    ["Extinct Matteo"] = 625000,
+    ["Las Tralaleritas"] = 650000,
+    ["Rocco Disco"] = 650000,
+    ["Reindeer Tralala"] = 600000,
+    ["Las Vaquitas Saturnitas"] = 750000,
+    ["Pumpkin Spyderini"] = 650000,
+    ["Job Job Job Sahur"] = 700000,
+    ["Los Karkeritos"] = 750000,
+    ["Graipuss Medussi"] = 1000000,
+    ["Santteo"] = 800000,
+    ["La Vacca Jacko Linterino"] = 850000,
+    ["Triplito Tralaleritos"] = 875000,
+    ["Trickolino"] = 900000,
+    ["Giftini Spyderini"] = 999900,
+    ["Los Spyderinis"] = 450000,
+    ["Love Love Love Sahur"] = 1000000,
+    ["Perrito Burrito"] = 1000000,
+    ["1x1x1x1"] = 1100000,
+    ["Los Cucarachas"] = 1200000,
+    ["Please My Present"] = 1300000,
+    ["Cuadramat and Pakrahmatmamat"] = 1400000,
+    ["Los Jobcitos"] = 1500000,
+    ["Nooo My Hotspot"] = 2000000,
+    ["Pot Hotspot"] = 2500000,
+    ["Noo My Examine"] = 1700000,
+    ["Telemorte"] = 2000000,
+    ["La Sahur Combinasion"] = 2000000,
+    ["List List List Sahur"] = 2000000,
+    ["To To To Sahur"] = 2500000,
+    ["Pirulitoita Bicicletaire"] = 2500000,
+    ["25"] = 2500000,
+    ["Santa Hotspot"] = 2600000,
+    ["Horegini Boom"] = 2700000,
+    ["Quesadilla Crocodila"] = 3000000,
+    ["Pot Pumpkin"] = 3000000,
+    ["Naughty Naughty"] = 3000000,
+    ["Cupid Cupid Sahur"] = 3100000,
+    ["Ho Ho Ho Sahur"] = 3200000,
+    ["Mi Gatito"] = 3200000,
+    ["Chicleteira Bicicleteira"] = 3500000,
+    ["Cupid Hotspot"] = 3500000,
+    ["Spaghetti Tualetti"] = 6000000,
+    ["Esok Sekolah"] = 30000000,
+    ["Quesadillo Vampiro"] = 3500000,
+    ["Brunito Marsito"] = 3500000,
+    ["Chill Puppy"] = 4000000,
+    ["Burrito Bandito"] = 4000000,
+    ["Chicleteirina Bicicleteirina"] = 4000000,
+    ["Los Quesadillas"] = 4500000,
+    ["Bunito Bunito Spinito"] = 3000000,
+    ["Noo My Candy"] = 5000000,
+    ["Los Nooo My Hotspotsitos"] = 5000000,
+    ["La Grande Combinassion"] = 10000000,
+    ["Rang Ring Bus"] = 6000000,
+    ["Guest 666"] = 6600000,
+    ["Los Mi Gatitos"] = 6500000,
+    ["Los Chicleteiras"] = 7000000,
+    ["67"] = 7500000,
+    ["Donkeyturbo Express"] = 7500000,
+    ["Mariachi Corazoni"] = 12500000,
+    ["Los Burritos"] = 8500000,
+    ["Los 25"] = 10000000,
+    ["Swag Soda"] = 13000000,
+    ["Noo my Heart"] = 13000000,
+    ["Chimnino"] = 14000000,
+    ["Los Combinasionas"] = 15000000,
+    ["Chicleteira Noelteira"] = 15000000,
+    ["Fishino Clownino"] = 15500000,
+    ["Tacorita Bicicleta"] = 16500000,
+    ["Spinny Hammy"] = 17000000,
+    ["Nuclearo Dinosauro"] = 15000000,
+    ["Las Sis"] = 17500000,
+    ["Chicleteira Cupideira"] = 17500000,
+    ["La Karkerkar Combinasion"] = 17500000,
+    ["Chillin Chili"] = 25000000,
+    ["Chipso and Queso"] = 25000000,
+    ["Money Money Reindeer"] = 25000000,
+    ["Money Money Puggy"] = 21000000,
+    ["Celularcini Viciosini"] = 22500000,
+    ["Los Planitos"] = 18500000,
+    ["Los Mobilis"] = 22000000,
+    ["Los 67"] = 22500000,
+    ["Mieteteira Bicicleteira"] = 26000000,
+    ["Tuff Toucan"] = 26000000,
+    ["La Spooky Grande"] = 24500000,
+    ["Los Spooky Combinasionas"] = 20000000,
+    ["Los Candies"] = 23000000,
+    ["Los Hotspositos"] = 25000000,
+    ["Los Jolly Combinasionas"] = 25000000,
+    ["Los Puggies"] = 30000000,
+    ["W or L"] = 30000000,
+    ["Tralalalaledon"] = 37500000,
+    ["La Extinct Grande"] = 23500000,
+    ["Tralaledon"] = 27500000,
+    ["La Jolly Grande"] = 30000000,
+    ["Los Primos"] = 31000000,
+    ["Bacuru and Egguru"] = 24000000,
+    ["Eviledon"] = 31500000,
+    ["Los Tacoritas"] = 32000000,
+    ["Lovin Rose"] = 32500000,
+    ["Tang Tang Kelentang"] = 33500000,
+    ["Ketupat Kepat"] = 35000000,
+    ["Los Bros"] = 37500000,
+    ["Tictac Sahur"] = 37500000,
+    ["La Romantic Grande"] = 40000000,
+    ["Gingerat Gerat"] = 40000000,
+    ["Orcaledon"] = 40000000,
+    ["Ketchuru and Masturu"] = 42500000,
+    ["Jolly Jolly Sahur"] = 45000000,
+    ["Garama and Madundung"] = 50000000,
+    ["Rosetti Tualetti"] = 50000000,
+    ["Festive 67"] = 67000000,
+    ["Love Love Bear"] = 140000000,
+    ["La Ginger Sekolah"] = 75000000,
+    ["Spooky and Pumpky"] = 80000000,
+    ["Lavadorito Spinito"] = 45000000,
+    ["Los Spaghettis"] = 70000000,
+    ["La Casa Boo"] = 100000000,
+    ["Fragrama and Chocrama"] = 100000000,
+    ["La Secret Combinasion"] = 125000000,
+    ["Reinito Sleighito"] = 140000000,
+    ["Ketupat Bros"] = 145000000,
+    ["Burguro And Fryuro"] = 150000000,
+    ["Cooki and Milki"] = 155000000,
+    ["Capitano Moby"] = 160000000,
+    ["Rosey and Teddy"] = 165000000,
+    ["Popcuru and Fizzuru"] = 170000000,
+    ["Cerberus"] = 175000000,
+    ["La Supreme Combinasion"] = 200000000,
+    ["Dragon Cannelloni"] = 250000000,
+    ["Dragon Gingerini"] = 300000000,
+    ["Headless Horseman"] = 325000000,
+    ["Hydra Dragon Cannelloni"] = 350000000,
+    ["Skibidi Toilet"] = 400000000,
+    ["Meowl"] = 500000000,
+    ["Strawberry Elephant"] = 750000000
+
+}
+local mutationMultipliers = {
+    ["None"] = 1,
+    ["Gold"] = 1.25,
+    ["Diamond"] = 1.5,
+    ["Bloodrot"] = 2,
+    ["Candy"] = 4,
+    ["Lava"] = 6,
+    ["Galaxy"] = 7,
+    ["YinYang"] = 7.5,
+    ["Radioactive"] = 8.5,
+    ["Cursed"] = 9,
+    ["Divine"] = 10,
+    ["Rainbow"] = 10
+}
+
+local traits = {
+    -- OG Event Traits
+    ["Strawberry"] = 8,
+    ["Meowl"] = 7,
+    ["Skibidi"] = 6.5,
+    [":3"] = 1.5,
+
+    -- Seasonal Event Traits
+    ["Reindeer"] = 6,
+    ["Santa Hat"] = 5,
+    ["Jack O' Lantern"] = 5.5,
+    ["RIP Tombstone"] = 4.5,
+    ["Witching Hour"] = 4.5,
+    ["Extinct"] = 4,
+    ["10B"] = 4,
+    ["2026"] = 6,
+
+    -- Ritual Event Traits
+    ["Paint"] = 6,
+    ["Tie"] = 4.75,
+    ["Spider"] = 4.5,
+    ["Matteo Hat"] = 4.5,
+    ["Galactic"] = 4,
+    ["Explosive"] = 4,
+    ["Shark Fin"] = 4,
+
+    -- Country Event Traits
+    ["Brazil"] = 6,
+    ["Indonesian"] = 5,
+    ["Sombrero"] = 5, -- Mexico Hat / Sombrero
+
+    -- Admin-Only Event Traits
+    ["Fire"] = 6,
+    ["Rose"] = 6,
+    ["Fireworks"] = 6,
+    ["Nyan"] = 6,
+    ["Lightning"] = 6,
+    ["Disco"] = 5,
+    ["Glitched"] = 5,
+    ["CrabClaw"] = 5, -- Crab Claw
+    ["Tung Tung Attack"] = 5, -- Zombie / EvilTungTungSahur
+    ["Bubblegum"] = 4,
+    ["UFO"] = 3,
+    ["Taco"] = 3,
+
+    -- Natural Event Traits
+    ["Comet-struck"] = 3.5,
+    ["Snowy"] = 3,
+    ["Wet"] = 2.5,
+
+    -- Worst Trait
+    ["Sleepy"] = 0.5, -- ÷2
+}
+local traitAliases = {
+    -- Strawberry / Meowl / Skibidi
+    ["ICON Meowl"] = "Meowl",
+    ["SkibidiIcon"] = "Skibidi",
+    ["Strawberry Strawberry"] = "Strawberry",
+    [":3"] = ":3",
+    [" :3"] = ":3",
+    [":3 "] = ":3",
+
+    -- Seasonal
+    ["SantaHatIcon"] = "Santa Hat",
+    ["Jack-o-Lantern Pet Trait"] = "Jack O' Lantern",
+    ["GraveYard-RIP-Tombstone"] = "RIP Tombstone",
+    ["Witchhat"] = "Witching Hour",
+    ["Extincty"] = "Extinct",
+    ["10b"] = "10B",
+    ["2026Trait"] = "2026",
+    ["2026Trait26"] = "2026",
+
+    -- Ritual
+    ["Chicleteirabicicleteira"] = "Paint",
+    ["MatteoHat"] = "Matteo Hat",
+    ["Comet2"] = "Galactic",
+    ["Bombardiro"] = "Explosive",
+
+    -- Country
+    ["Mexico Hat"] = "Sombrero",
+
+    -- Admin-only / other common in-game wording
+    ["Dragon"] = "Lightning",
+    ["Lightning Dragon"] = "Lightning",
+    ["Alienevent"] = "UFO",
+    ["AlieneventUFO"] = "UFO",
+    ["Glitch"] = "Glitched",
+    ["Crab Claw"] = "CrabClaw",
+    ["Claw"] = "CrabClaw",
+    ["Claws"] = "CrabClaw", -- your webhook shows this
+    ["EvilTungTungSahur"] = "Tung Tung Attack",
+    ["Zombie"] = "Tung Tung Attack",
+    ["Reindeer Pet"] = "Reindeer",
+    -- Natural
+    ["Cometstruck"] = "Comet-struck",
+    ["CometstruckComet-struck"] = "Comet-struck",
+    ["WetRain"] = "Wet",
+    ["SnowySnowy"] = "Snowy",
+
+    -- Worst
+    ["SleepySleepy"] = "Sleepy",
+}
+
+--// WEBHOOK ONLY MODE (Gist handled by Master Bot)
+local HttpService = game:GetService("HttpService")
+
 local function getRequest()
-    return (syn and syn.request) or (http and http.request) or http_request or request
+    return (syn and syn.request)
+        or (http and http.request)
+        or http_request
+        or request
+end
+
+--// HELPERS
+local function clampStr(s, maxLen)
+    s = tostring(s or "")
+    if #s > maxLen then
+        return s:sub(1, maxLen - 3) .. "..."
+    end
+    return s
 end
 
 local function short(n)
     n = tonumber(n) or 0
     local abs = math.abs(n)
-    for _, s in ipairs({{1e12,"T"},{1e9,"B"},{1e6,"M"},{1e3,"K"}}) do
-        if abs >= s[1] then
-            return string.format("%.1f", n / s[1]):gsub("%.0$","") .. s[2]
+    local suffixes = {
+        {1e12, "T"},
+        {1e9, "B"},
+        {1e6, "M"},
+        {1e3, "K"}
+    }
+    for _, s in ipairs(suffixes) do
+        local value, suffix = s[1], s[2]
+        if abs >= value then
+            local num = n / value
+            return string.format("%.2f", num):gsub("%.00$", "") .. suffix
         end
     end
     return tostring(n)
 end
 
-local function timeAgo(ts)
-    local d = os.time() - ts
-    if d < 0 then return "now" end
-    if d < 60 then return d.."s"
-    elseif d < 3600 then return math.floor(d/60).."m"
-    elseif d < 86400 then return math.floor(d/3600).."h"
-    else return math.floor(d/86400).."d" end
-end
-
-local function getTimeColor(ts)
-    local d = (os.time() - ts) / 60
-    if d >= 10 then return T.Red
-    elseif d >= 5 then return T.Orange
-    else return T.TextDim end
-end
-
--- ══════════════════════════════════════════
---  UI HELPERS
--- ══════════════════════════════════════════
-local function corner(p, r)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, r or 4)
-    c.Parent = p
-    return c
-end
-
-local function stroke(p, color, thick, trans)
-    local s = Instance.new("UIStroke")
-    s.Color = color or T.Border
-    s.Thickness = thick or 1
-    s.Transparency = trans or 0
-    s.Parent = p
-    return s
-end
-
-local function lbl(parent, props)
-    local l = Instance.new("TextLabel")
-    l.BackgroundTransparency = 1
-    l.TextXAlignment = props.align or Enum.TextXAlignment.Left
-    l.Font = props.font or Enum.Font.Code
-    l.TextSize = props.size or 12
-    l.TextColor3 = props.color or T.Text
-    l.Text = props.text or ""
-    l.Size = props.sz or UDim2.new(1,0,1,0)
-    l.Position = props.pos or UDim2.new(0,0,0,0)
-    l.TextTruncate = props.trunc and Enum.TextTruncate.AtEnd or Enum.TextTruncate.None
-    l.Parent = parent
-    return l
-end
-
-local function frm(parent, props)
-    local f = Instance.new("Frame")
-    f.Size = props.sz or UDim2.new(1,0,0,32)
-    f.Position = props.pos or UDim2.new(0,0,0,0)
-    f.BackgroundColor3 = props.bg or T.Panel
-    f.BorderSizePixel = 0
-    f.Parent = parent
-    return f
-end
-
-local function pill(parent, text, color, xOff, yOff, w)
-    local p = frm(parent, {sz=UDim2.new(0,w or 52,0,18), pos=UDim2.new(1,xOff,0,yOff), bg=T.Bg})
-    corner(p, 3)
-    stroke(p, color, 1, 0.4)
-    lbl(p, {text=text, size=10, color=color, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
-    return p
-end
-
--- ══════════════════════════════════════════
---  FETCH
--- ══════════════════════════════════════════
-local function fetchGistData()
-    if USE_MOCK_DATA then
-        return {
-            jobId="mock-bot", placeId=109983668079237, timestamp=os.time(), playerCount=0,
-            brainrots={
-                {name="Dragon Cannelloni",rarity="Secret",mutation="Rainbow",traits="Lightning",income=500000000,cost=250000000000,serverId="srv-abc123",foundAt=os.time()-60,playerCount=8},
-                {name="Meowl",rarity="OG",mutation="Divine",traits="Meowl",income=800000000,cost=500000000000,serverId="srv-abc123",foundAt=os.time()-30,playerCount=8},
-                {name="Ultra Rat",rarity="God",mutation="Cosmic",traits="Speed",income=120000000,cost=999000000000,serverId="srv-xyz789",foundAt=os.time()-10,playerCount=12},
-                {name="Smurf Cat",rarity="Burat",mutation="Frost",traits="Chill",income=45000000,cost=50000000000,serverId="srv-xyz789",foundAt=os.time()-200,playerCount=12},
-            }
-        }
-    end
-    local req = getRequest()
-    if not req then return nil end
-    local ok, result = pcall(function()
-        local res = req({
-            Url = "https://api.github.com/gists/"..GIST_ID,
-            Method = "GET",
-            Headers = {
-                ["Authorization"] = "token "..GITHUB_TOKEN,
-                ["User-Agent"] = "Roblox-Brainrot-Viewer"
-            }
-        })
-        if res.StatusCode == 200 then
-            local data = HttpService:JSONDecode(res.Body)
-            return HttpService:JSONDecode(data.files[GIST_FILENAME].content)
-        end
-    end)
-    return ok and result or nil
-end
-
--- ══════════════════════════════════════════
---  BUILD GUI
--- ══════════════════════════════════════════
-local function buildGUI()
-    local old = CoreGui:FindFirstChild("BrainrotViewerV3")
-    if old then old:Destroy() end
-
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "BrainrotViewerV3"
-    sg.ResetOnSpawn = false
-    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-    -- ── Main Window (compact: 560 × 460) ───────
-    local win = Instance.new("Frame")
-    win.Name = "Window"
-    win.Size = UDim2.new(0, 560, 0, 460)
-    win.Position = UDim2.new(0.5, -280, 0.5, -230)
-    win.BackgroundColor3 = T.Bg
-    win.BorderSizePixel = 0
-    win.Parent = sg
-    corner(win, 8)
-    stroke(win, T.BorderBright, 1, 0)
-
-    -- ── Title Bar (34px) ───────────────────────
-    local titleBar = Instance.new("TextButton")
-    titleBar.Name = "TitleBar"
-    titleBar.Size = UDim2.new(1,0,0,34)
-    titleBar.BackgroundColor3 = T.Panel
-    titleBar.BorderSizePixel = 0
-    titleBar.Text = ""
-    titleBar.AutoButtonColor = false
-    titleBar.Parent = win
-    corner(titleBar, 8)
-    
-    -- Bottom border separator
-    local sep = frm(win, {sz=UDim2.new(1,0,0,1), pos=UDim2.new(0,0,0,34), bg=T.BorderBright})
-
-    -- Logo dot
-    local logoDot = frm(titleBar, {sz=UDim2.new(0,8,0,8), pos=UDim2.new(0,12,0,13), bg=T.Green})
-    corner(logoDot, 4)
-
-    -- Title
-    lbl(titleBar, {
-        text="CLY NOTIFY", size=12, color=T.Text, font=Enum.Font.Code,
-        sz=UDim2.new(0,180,1,0), pos=UDim2.new(0,28,0,0),
-        align=Enum.TextXAlignment.Left
-    })
-
-    -- Status label — sits left of the chips cluster, right of title
-    -- chips start at -280, so status fits in the gap between title and chips
-    local statusLbl = Instance.new("TextLabel")
-    statusLbl.Name = "StatusLbl"
-    statusLbl.BackgroundTransparency = 1
-    statusLbl.Size = UDim2.new(0,90,1,0)
-    statusLbl.Position = UDim2.new(1,-370,0,0)
-    statusLbl.Font = Enum.Font.Code
-    statusLbl.TextSize = 10
-    statusLbl.TextColor3 = T.TextDim
-    statusLbl.Text = "· syncing..."
-    statusLbl.TextXAlignment = Enum.TextXAlignment.Right
-    statusLbl.Parent = titleBar
-
-    -- Title bar right side layout (from right edge, no overlaps):
-    --  [✕]       pos X: UDim2(1,-30, ...)   width 22
-    --  [–]       pos X: UDim2(1,-56, ...)   width 22
-    --  [↺]       pos X: UDim2(1,-82, ...)   width 22
-    --  divider   pos X: UDim2(1,-92, ...)   width 1
-    --  chip "Servers" pos X: UDim2(1,-182, ...)  width 88
-    --  divider   pos X: UDim2(1,-190, ...)  width 1
-    --  chip "Total"   pos X: UDim2(1,-280, ...)  width 88
-
-    -- Helper: small 22×22 action button with solid bg
-    local function winBtn(xPos, sym, normalBg, hoverBg, normalCol, hoverCol)
-        local b = Instance.new("TextButton")
-        b.Size = UDim2.new(0,22,0,22)
-        b.Position = UDim2.new(1,xPos,0,6)
-        b.BackgroundColor3 = normalBg
-        b.Text = sym
-        b.TextColor3 = normalCol
-        b.TextSize = 12
-        b.Font = Enum.Font.GothamBold
-        b.BorderSizePixel = 0
-        b.AutoButtonColor = false
-        b.Parent = titleBar
-        corner(b, 4)
-        b.MouseEnter:Connect(function()
-            b.BackgroundColor3 = hoverBg
-            b.TextColor3 = hoverCol
-        end)
-        b.MouseLeave:Connect(function()
-            b.BackgroundColor3 = normalBg
-            b.TextColor3 = normalCol
-        end)
-        return b
-    end
-
-    -- ✕ close — rightmost
-    local closeBtn = winBtn(-30, "✕",
-        Color3.fromRGB(48,18,18), Color3.fromRGB(239,68,68),
-        Color3.fromRGB(239,68,68), Color3.fromRGB(255,255,255))
-
-    -- – minimize
-    local minimizeBtn = winBtn(-56, "–",
-        Color3.fromRGB(30,30,30), Color3.fromRGB(50,50,50),
-        Color3.fromRGB(160,160,160), Color3.fromRGB(220,220,220))
-
-    -- ↺ resync
-    local resyncBtn = winBtn(-82, "↺",
-        Color3.fromRGB(18,30,20), Color3.fromRGB(20,50,25),
-        Color3.fromRGB(74,222,128), Color3.fromRGB(134,239,172))
-    resyncBtn.Name = "ResyncBtn"
-
-    -- Divider before chips
-    frm(titleBar, {sz=UDim2.new(0,1,0,16), pos=UDim2.new(1,-94,0,9), bg=T.BorderBright})
-
-    -- Stat chips — each 88px wide
-    local function tinyChip(icon, key, xOff, accentCol)
-        local chip = frm(titleBar, {sz=UDim2.new(0,88,0,22), pos=UDim2.new(1,xOff,0,6), bg=T.Card})
-        corner(chip, 4)
-        stroke(chip, T.Border, 1, 0)
-        local chipAccent = frm(chip, {sz=UDim2.new(0,2,0,12), pos=UDim2.new(0,0,0,5), bg=accentCol or T.AccentSub})
-        corner(chipAccent, 1)
-        lbl(chip, {text=icon, size=10, color=T.TextDim, font=Enum.Font.Code,
-            sz=UDim2.new(0,20,1,0), pos=UDim2.new(0,6,0,0), align=Enum.TextXAlignment.Center})
-        local val = Instance.new("TextLabel")
-        val.Name = key
-        val.BackgroundTransparency = 1
-        val.Size = UDim2.new(1,-28,1,0)
-        val.Position = UDim2.new(0,28,0,0)
-        val.Font = Enum.Font.Code
-        val.TextSize = 11
-        val.TextColor3 = T.Text
-        val.Text = "0"
-        val.TextXAlignment = Enum.TextXAlignment.Left
-        val.Parent = chip
-        return val
-    end
-
-    local serverLbl = tinyChip("🖥", "ServerLbl", -183, T.Blue)
-    frm(titleBar, {sz=UDim2.new(0,1,0,16), pos=UDim2.new(1,-191,0,9), bg=T.BorderBright})
-    local totalLbl  = tinyChip("📦", "TotalLbl",  -280, T.Green)
-
-    -- ── Scroll Area ────────────────────────────
-    local scroll = Instance.new("ScrollingFrame")
-    scroll.Name = "Scroll"
-    scroll.Size = UDim2.new(1,-2,1,-36)
-    scroll.Position = UDim2.new(0,1,0,36)
-    scroll.BackgroundTransparency = 1
-    scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 3
-    scroll.ScrollBarImageColor3 = T.BorderBright
-    scroll.CanvasSize = UDim2.new(0,0,0,0)
-    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scroll.Parent = win
-
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Padding = UDim.new(0,1)
-    listLayout.Parent = scroll
-
-    local pad = Instance.new("UIPadding")
-    pad.PaddingTop    = UDim.new(0,6)
-    pad.PaddingBottom = UDim.new(0,6)
-    pad.PaddingLeft   = UDim.new(0,6)
-    pad.PaddingRight  = UDim.new(0,6)
-    pad.Parent = scroll
-
-    sg.Parent = CoreGui
-
-    return {
-        gui=sg, win=win, titleBar=titleBar, scroll=scroll,
-        statusLbl=statusLbl, totalLbl=totalLbl, serverLbl=serverLbl,
-        closeBtn=closeBtn, minimizeBtn=minimizeBtn, resyncBtn=resyncBtn,
+local function normalizeMutation(m)
+    m = tostring(m or "Default")
+    m = m:gsub("%s+", "")
+    local map = {
+        default = "Default",
+        gold = "Gold",
+        diamond = "Diamond",
+        bloodrot = "Bloodrot",
+        candy = "Candy",
+        lava = "Lava",
+        galaxy = "Galaxy",
+        yinyang = "YinYang",
+        radioactive = "Radioactive",
+        cursed = "Cursed",
+        divine = "Divine",
+        rainbow = "Rainbow",
     }
+    return map[m:lower()] or m
 end
 
--- ══════════════════════════════════════════
---  SERVER PANEL
--- ══════════════════════════════════════════
-local function buildServerPanel(serverId, brainrots, placeId, parent, order)
-    table.sort(brainrots, function(a,b)
-        local aPing = PING_NAMES[a.name] and 1 or 0
-        local bPing = PING_NAMES[b.name] and 1 or 0
-        if aPing ~= bPing then return aPing > bPing end
-        return (a.income or 0) > (b.income or 0)
-    end)
-
-    local isCurrentServer = (serverId == game.JobId)
-    local playerCount = brainrots[1] and brainrots[1].playerCount or 0
-    local shortId = serverId:sub(1,14).."…"
-
-    local isHighlighted = false
-    for _, br in ipairs(brainrots) do
-        if (br.income or 0) >= HIGH_INCOME_THRESHOLD then
-            isHighlighted = true; break
-        end
-    end
-
-    -- Wrapper
-    local wrapper = Instance.new("Frame")
-    wrapper.Size = UDim2.new(1,0,0,0)
-    wrapper.AutomaticSize = Enum.AutomaticSize.Y
-    wrapper.BackgroundTransparency = 1
-    wrapper.BorderSizePixel = 0
-    wrapper.LayoutOrder = order
-    wrapper.Parent = parent
-
-    -- Panel card
-    local panel = Instance.new("Frame")
-    panel.Size = UDim2.new(1,0,0,0)
-    panel.AutomaticSize = Enum.AutomaticSize.Y
-    panel.BackgroundColor3 = T.Panel
-    panel.BorderSizePixel = 0
-    panel.Parent = wrapper
-    corner(panel, 6)
-    
-    local borderColor = isHighlighted and T.Gold or (isCurrentServer and T.Cyan or T.Border)
-    stroke(panel, borderColor, 1, 0)
-
-    local panelLayout = Instance.new("UIListLayout")
-    panelLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    panelLayout.Padding = UDim.new(0,0)
-    panelLayout.Parent = panel
-
-    -- ── Server Header (28px) ──────────────────
-    local header = Instance.new("TextButton")
-    header.Size = UDim2.new(1,0,0,28)
-    header.BackgroundColor3 = T.Card
-    header.BorderSizePixel = 0
-    header.Text = ""
-    header.AutoButtonColor = false
-    header.LayoutOrder = 1
-    header.Parent = panel
-    corner(header, 6)
-
-    -- Left accent strip (2px)
-    local strip = frm(header, {sz=UDim2.new(0,2,0,16), pos=UDim2.new(0,8,0,6),
-        bg=isHighlighted and T.Gold or (isCurrentServer and T.Cyan or T.AccentSub)})
-    corner(strip, 1)
-
-    -- Server ID (takes most of the left space now)
-    lbl(header, {
-        text=(isHighlighted and "★ " or "")..shortId,
-        size=11, color=isHighlighted and T.Gold or T.TextMid, font=Enum.Font.Code,
-        sz=UDim2.new(1,-100,1,0), pos=UDim2.new(0,18,0,0),
-        align=Enum.TextXAlignment.Left, trunc=true
-    })
-
-    -- Right-side cluster: [👥N] [+N] [▾] [JOIN →]
-    -- Layout from right: join@-68, chevron@-86, found@-130, players@-178
-
-    -- Player count pill
-    local plrPill = frm(header, {sz=UDim2.new(0,40,0,18), pos=UDim2.new(1,-226,0,5), bg=T.Bg})
-    corner(plrPill, 3)
-    stroke(plrPill, T.Border, 1, 0)
-    lbl(plrPill, {text="👥"..playerCount, size=10, color=T.TextDim, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
-
-    -- Found count pill
-    local foundPill = frm(header, {sz=UDim2.new(0,36,0,18), pos=UDim2.new(1,-180,0,5), bg=T.Bg})
-    corner(foundPill, 3)
-    stroke(foundPill, T.GreenDim, 1, 0)
-    lbl(foundPill, {text="+"..#brainrots, size=10, color=T.Green, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
-
-    -- Thin separator before join area
-    frm(header, {sz=UDim2.new(0,1,0,14), pos=UDim2.new(1,-138,0,7), bg=T.BorderBright})
-
-    -- Join / Current badge — pinned to absolute right edge
-    -- badge width=62, right margin=6 → Position X = UDim2(1,-68,...)
-    -- chevron sits just left of badge: X = UDim2(1,-86,...)
-    local isOpen = true
-    local chevron = lbl(header, {
-        text="▾", size=13, color=T.TextDim, font=Enum.Font.Code,
-        sz=UDim2.new(0,16,1,0), pos=UDim2.new(1,-86,0,0),
-        align=Enum.TextXAlignment.Center
-    })
-
-    if isCurrentServer then
-        local here = frm(header, {sz=UDim2.new(0,62,0,18), pos=UDim2.new(1,-68,0,5), bg=T.Bg})
-        corner(here, 3)
-        stroke(here, T.Cyan, 1, 0.3)
-        lbl(here, {text="● HERE", size=10, color=T.Cyan, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
-    else
-        local joinBtn = Instance.new("TextButton")
-        joinBtn.Size = UDim2.new(0,62,0,18)
-        joinBtn.Position = UDim2.new(1,-68,0,5)
-        joinBtn.BackgroundColor3 = Color3.fromRGB(22,22,22)
-        joinBtn.Text = "JOIN →"
-        joinBtn.TextColor3 = T.TextMid
-        joinBtn.TextSize = 10
-        joinBtn.Font = Enum.Font.Code
-        joinBtn.BorderSizePixel = 0
-        joinBtn.AutoButtonColor = false
-        joinBtn.Parent = header
-        corner(joinBtn, 3)
-        stroke(joinBtn, T.BorderBright, 1, 0)
-        joinBtn.MouseEnter:Connect(function()
-            joinBtn.BackgroundColor3 = Color3.fromRGB(34,34,34)
-            joinBtn.TextColor3 = T.Green
-        end)
-        joinBtn.MouseLeave:Connect(function()
-            joinBtn.BackgroundColor3 = Color3.fromRGB(22,22,22)
-            joinBtn.TextColor3 = T.TextMid
-        end)
-        joinBtn.MouseButton1Click:Connect(function()
-            joinBtn.Text = "..."
-            pcall(function()
-                TeleportService:TeleportToPlaceInstance(placeId, serverId, Players.LocalPlayer)
-            end)
-        end)
-    end
-
-    -- ── Body ──────────────────────────────────
-    local body = Instance.new("Frame")
-    body.Size = UDim2.new(1,0,0,0)
-    body.AutomaticSize = Enum.AutomaticSize.Y
-    body.BackgroundTransparency = 1
-    body.BorderSizePixel = 0
-    body.LayoutOrder = 2
-    body.ClipsDescendants = false
-    body.Parent = panel
-
-    local bodyPad = Instance.new("UIPadding")
-    bodyPad.PaddingLeft   = UDim.new(0,6)
-    bodyPad.PaddingRight  = UDim.new(0,6)
-    bodyPad.PaddingTop    = UDim.new(0,3)
-    bodyPad.PaddingBottom = UDim.new(0,6)
-    bodyPad.Parent = body
-
-    local bodyLayout = Instance.new("UIListLayout")
-    bodyLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    bodyLayout.Padding = UDim.new(0,2)
-    bodyLayout.Parent = body
-
-    -- ── Brainrot Rows (compact 52px each) ─────
-    for i, br in ipairs(brainrots) do
-        local rarityColor = RARITY[br.rarity] or RARITY["Unknown"]
-        local isRainbow = (rarityColor == "rainbow")
-        local isPing = PING_NAMES[br.name]
-
-        local row = Instance.new("Frame")
-        row.Size = UDim2.new(1,0,0,52)
-        row.BackgroundColor3 = T.Bg
-        row.BorderSizePixel = 0
-        row.LayoutOrder = i
-        row.Parent = body
-        corner(row, 4)
-        stroke(row, isPing and Color3.fromRGB(40,40,60) or T.Border, 1, 0)
-
-        -- Ping dot (bright yellow, top-left corner)
-        if isPing then
-            local dot = frm(row, {sz=UDim2.new(0,6,0,6), pos=UDim2.new(0,4,0,4), bg=Color3.fromRGB(250,204,21)})
-            corner(dot, 4)
-            -- glow stroke
-            local dotStroke = Instance.new("UIStroke")
-            dotStroke.Color = Color3.fromRGB(253,224,71)
-            dotStroke.Thickness = 1.5
-            dotStroke.Transparency = 0.3
-            dotStroke.Parent = dot
-        end
-
-        -- Left rarity bar (2px)
-        local rarBar = frm(row, {sz=UDim2.new(0,2,0,36), pos=UDim2.new(0,6,0,8),
-            bg=isRainbow and Color3.fromRGB(255,0,200) or rarityColor})
-        corner(rarBar, 1)
-        if isRainbow then
-            local rg = Instance.new("UIGradient")
-            rg.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0.0,  Color3.fromRGB(255,0,0)),
-                ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255,200,0)),
-                ColorSequenceKeypoint.new(0.5,  Color3.fromRGB(0,255,100)),
-                ColorSequenceKeypoint.new(0.75, Color3.fromRGB(0,100,255)),
-                ColorSequenceKeypoint.new(1.0,  Color3.fromRGB(200,0,255)),
-            })
-            rg.Rotation = 90
-            rg.Parent = rarBar
-        end
-
-        -- ── Row line 1: Name + rarity + time ──
-        lbl(row, {
-            text=br.name, size=12, color=T.Text, font=Enum.Font.Code,
-            sz=UDim2.new(1,-145,0,16), pos=UDim2.new(0,16,0,6),
-            align=Enum.TextXAlignment.Left, trunc=true
-        })
-
-        -- Rarity badge (right side)
-        local rCol = isRainbow and Color3.fromRGB(200,100,255) or rarityColor
-        local rb = frm(row, {sz=UDim2.new(0,52,0,15), pos=UDim2.new(1,-110,0,7), bg=T.Bg})
-        corner(rb, 3)
-        stroke(rb, rCol, 1, 0.3)
-        local rLbl = lbl(rb, {
-            text=br.rarity, size=9, color=rCol, font=Enum.Font.Code,
-            align=Enum.TextXAlignment.Center
-        })
-        if isRainbow then
-            local rg2 = Instance.new("UIGradient")
-            rg2.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0,   Color3.fromRGB(255,80,80)),
-                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80,255,180)),
-                ColorSequenceKeypoint.new(1,   Color3.fromRGB(180,80,255)),
-            })
-            rg2.Parent = rLbl
-        end
-
-        -- Time ago
-        lbl(row, {
-            text=timeAgo(br.foundAt), size=10, color=getTimeColor(br.foundAt), font=Enum.Font.Code,
-            sz=UDim2.new(0,44,0,15), pos=UDim2.new(1,-54,0,8),
-            align=Enum.TextXAlignment.Right
-        })
-
-        -- ── Row line 2: Income | Cost | Mutation | Traits ──
-        local line2 = frm(row, {sz=UDim2.new(1,-16,0,16), pos=UDim2.new(0,16,0,28), bg=T.Transparent})
-        line2.BackgroundTransparency = 1
-
-        local l2layout = Instance.new("UIListLayout")
-        l2layout.FillDirection = Enum.FillDirection.Horizontal
-        l2layout.VerticalAlignment = Enum.VerticalAlignment.Center
-        l2layout.Padding = UDim.new(0,0)
-        l2layout.Parent = line2
-
-        local function stat2(icon, val, col, w)
-            local s = frm(line2, {sz=UDim2.new(0,w,1,0), bg=T.Transparent})
-            s.BackgroundTransparency = 1
-            lbl(s, {text=icon..val, size=10, color=col, font=Enum.Font.Code, align=Enum.TextXAlignment.Left})
-        end
-
-        stat2("$", short(br.income).."/s", T.Green, 100)
-        stat2("¢", short(br.cost),          T.Yellow, 86)
-        stat2("◈", br.mutation or "—",      T.TextDim, 90)
-        stat2("◎", br.traits or "—",        T.TextDim, 0)
-    end
-
-    -- ── Dropdown toggle ───────────────────────
-    local function setOpen(open)
-        isOpen = open
-        body.Visible = open
-        chevron.Text = open and "▾" or "▸"
-        chevron.TextColor3 = open and T.TextMid or T.TextDim
-    end
-
-    header.MouseButton1Click:Connect(function() setOpen(not isOpen) end)
-    header.MouseEnter:Connect(function() header.BackgroundColor3 = T.CardHover end)
-    header.MouseLeave:Connect(function() header.BackgroundColor3 = T.Card end)
-
-    return wrapper
+local function normalizeBrainrotName(raw)
+    raw = tostring(raw or "")
+    raw = raw:gsub("%b[]", "")
+    raw = raw:gsub("%b()", "")
+    raw = raw:gsub("^%s+", ""):gsub("%s+$", "")
+    return raw
 end
 
--- ══════════════════════════════════════════
---  UPDATE GUI
--- ══════════════════════════════════════════
-local function updateGUI(ui, data)
-    if not data then
-        ui.statusLbl.Text = "· error"
-        ui.statusLbl.TextColor3 = T.Red
+local function normalizeKey(raw)
+    return normalizeBrainrotName(raw):lower()
+end
+
+local function parseTraits(traitString)
+    if not traitString then return {} end
+    local result, seen = {}, {}
+    for part in string.gmatch(tostring(traitString), "[^,]+") do
+        local clean = part:gsub("%s*[xX]%d+", ""):gsub("^%s+", ""):gsub("%s+$", "")
+        if clean ~= "" and not seen[clean] then
+            seen[clean] = true
+            table.insert(result, clean)
+        end
+    end
+    return result
+end
+
+local function getMutation(obj)
+    if not obj then return nil end
+    local attr = obj:GetAttribute("Mutation")
+    if attr ~= nil then return tostring(attr) end
+    local v = obj:FindFirstChild("Mutation")
+    if v and v:IsA("ValueBase") then return tostring(v.Value) end
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d.Name == "Mutation" and d:IsA("ValueBase") then
+            return tostring(d.Value)
+        end
+    end
+    local tag = obj.Name:match("%[(.-)%]") or obj.Name:match("%((.-)%)")
+    if tag then return tag end
+    return nil
+end
+
+local function getTrait(obj)
+    if not obj then return nil end
+    local attr = obj:GetAttribute("Traits")
+    if attr ~= nil then return tostring(attr) end
+    local v = obj:FindFirstChild("Traits")
+    if v and v:IsA("ValueBase") then return tostring(v.Value) end
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d.Name == "Traits" and d:IsA("ValueBase") then
+            return tostring(d.Value)
+        end
+    end
+    return nil
+end
+
+local function computeIncome(baseIncome, mutation, traitString)
+    local base = tonumber(baseIncome) or 0
+    mutation = normalizeMutation(mutation)
+    local mMult = mutationMultipliers[mutation] or 1
+    local rawTraits = parseTraits(traitString)
+    local mults = {}
+    local displayTraits = {}
+    local seen = {}
+
+    for _, rawTrait in ipairs(rawTraits) do
+        local tName = traitAliases[rawTrait] or rawTrait
+        local tMult = traits[tName]
+        if tMult then
+            table.insert(mults, tMult)
+        else
+            warn("[Brainrot] Unknown trait:", rawTrait, "mapped:", tName)
+        end
+        if not seen[tName] then
+            seen[tName] = true
+            table.insert(displayTraits, tName)
+        end
+    end
+
+    if mMult > 1 then
+        table.insert(mults, mMult)
+    end
+
+    if #mults == 0 then
+        return base, displayTraits
+    end
+
+    table.sort(mults, function(a,b) return a > b end)
+    local sum = mults[1]
+    for i = 2, #mults do
+        local reduced = mults[i] - 1
+        if reduced > 0 then
+            sum += reduced
+        end
+    end
+
+    return math.floor(base * sum), displayTraits
+end
+
+--// LOOKUP SET
+local brainrotSet = {}
+for _, n in ipairs(brainrots) do
+    brainrotSet[normalizeKey(n)] = true
+end
+
+local function normKey(s)
+    return normalizeKey(s)
+end
+
+local function normalizeMap(map)
+    local out = {}
+    for k, v in pairs(map) do
+        out[normKey(k)] = v
+    end
+    return out
+end
+
+rarityByName = normalizeMap(rarityByName)
+costByName = normalizeMap(costByName)
+incomeByName = normalizeMap(incomeByName)
+
+local newPing = {}
+for name,_ in pairs(PING_NAMES) do
+    newPing[normKey(name)] = true
+end
+PING_NAMES = newPing
+
+--// WEBHOOK
+local MAX_FIELDS_PER_EMBED = 25
+local MAX_EMBEDS_PER_MESSAGE = 10
+
+local function chunkArray(arr, chunkSize)
+    local out = {}
+    for i = 1, #arr, chunkSize do
+        local chunk = {}
+        for j = i, math.min(i + chunkSize - 1, #arr) do
+            table.insert(chunk, arr[j])
+        end
+        table.insert(out, chunk)
+    end
+    return out
+end
+
+local function sendWebhookGrouped(entries)
+    if type(entries) ~= "table" or #entries == 0 then return end
+
+    local req = getRequest()
+    if not req then
+        warn("[Webhook] No request function found")
         return
     end
 
-    for _, ch in ipairs(ui.scroll:GetChildren()) do
-        if ch:IsA("Frame") then ch:Destroy() end
-    end
-
     local groups = {}
-    for _, br in ipairs(data.brainrots or {}) do
-        local sid = br.serverId or "unknown"
-        groups[sid] = groups[sid] or {}
-        table.insert(groups[sid], br)
+    for _, e in ipairs(entries) do
+        local r = e.rarity or "Unknown"
+        groups[r] = groups[r] or {}
+        table.insert(groups[r], e)
     end
 
-    local total, serverCount = #(data.brainrots or {}), 0
-    for _ in pairs(groups) do serverCount = serverCount + 1 end
+    local rarities = {}
+    for r,_ in pairs(groups) do table.insert(rarities, r) end
+    table.sort(rarities, function(a,b)
+        return (RARITY_ORDER[a] or 0) > (RARITY_ORDER[b] or 0)
+    end)
 
-    ui.totalLbl.Text  = tostring(total)
-    ui.serverLbl.Text = tostring(serverCount).." srv"
+    local t = os.date("!*t")
+    local timestamp = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.min, t.sec)
+    local playerCount = #Players:GetPlayers()
 
-    local sorted = {}
-    for sid, brs in pairs(groups) do
-        local t = 0
-        for _, b in ipairs(brs) do if b.foundAt > t then t = b.foundAt end end
-        table.insert(sorted, {id=sid, brs=brs, latest=t})
+    local allEmbeds = {}
+
+    for _, rarity in ipairs(rarities) do
+        local bucket = groups[rarity]
+        table.sort(bucket, function(a,b)
+            return (a.income or 0) > (b.income or 0)
+        end)
+
+        local brainrotFields = {}
+        for _, e in ipairs(bucket) do
+            local fname = ("💵 %s/s"):format(short(e.income))
+            local fval = e.line
+            table.insert(brainrotFields, {
+                name = clampStr(fname, 256),
+                value = clampStr(fval, 1024),
+                inline = false
+            })
+        end
+
+        local PER_EMBED_BRAINROT_FIELDS = MAX_FIELDS_PER_EMBED - 2
+        local fieldChunks = chunkArray(brainrotFields, PER_EMBED_BRAINROT_FIELDS)
+
+        for idx, fchunk in ipairs(fieldChunks) do
+            table.insert(fchunk, {
+                name = "Server ID",
+                value = "```" .. game.JobId .. "```",
+                inline = false
+            })
+
+            table.insert(allEmbeds, {
+                title = (#fieldChunks > 1)
+                    and ("Found Brainrots — %s (%d/%d)"):format(rarity, idx, #fieldChunks)
+                    or ("Found Brainrots — %s"):format(rarity),
+                url = "https://www.roblox.com/games/start?placeId=109983668079237&gameInstanceId="..game.JobId,
+                description = "",
+                color = RARITY_COLOR[rarity] or RARITY_COLOR["Unknown"],
+                thumbnail = {url = "https://static.wikia.nocookie.net/stealabr/images/e/e3/Tung_Tung_Tung_Sahur.png/revision/latest?cb=20260125163843"},
+                footer = {text = player.Name .. " | " .. tostring(playerCount) .. "/8👤"},
+                fields = fchunk,
+                timestamp = timestamp
+            })
+        end
     end
-    table.sort(sorted, function(a,b) return a.latest > b.latest end)
 
-    for idx, s in ipairs(sorted) do
-        buildServerPanel(s.id, s.brs, data.placeId, ui.scroll, idx)
+    local embedBatches = chunkArray(allEmbeds, MAX_EMBEDS_PER_MESSAGE)
+
+    for i, embedBatch in ipairs(embedBatches) do
+    local contentForThis = (i == 1) and Content or ""
+    local isPingMessage = contentForThis == "@everyone"
+    
+    local targetUrl = isPingMessage and WEBHOOK_PING or WEBHOOK_NORMAL
+    
+    local payload = {
+        content = contentForThis,
+        username = "Cly Notify",
+        avatar_url = "https://assets.teenvogue.com/photos/5d4daf13b068cf00080a03f7/16:9/w_2560%2Cc_limit/00-story-diddy.jpg",
+        embeds = embedBatch,
+        allowed_mentions = (contentForThis ~= "" and { parse = {"everyone"} } or { parse = {} })
+    }
+
+    -- Override sendWebhookPayload to use specific URL
+    local req = getRequest()
+    local success, res = pcall(function()
+        return req({
+            Url = targetUrl,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode(payload)
+        })
+    end)
+    
+    if success and res then
+        print("[Webhook] Sent to", isPingMessage and "PING" or "NORMAL", "webhook | Status:", res.StatusCode)
+    else
+        warn("[Webhook] Failed:", res)
+    end
+
+    if i < #embedBatches then
+        task.wait(0.35)
+    end
+end
+end
+
+-- ✅ FIX: Better batch management
+local globalFound = {}
+local webhookTimer = nil
+
+local function queueWebhookSend()
+    if webhookTimer then
+        webhookTimer:Cancel()
+    end
+    
+    webhookTimer = task.delay(SEND_DELAY, function()
+        webhookTimer = nil
+        
+        if #globalFound == 0 then return end
+
+        -- ✅ FIX: Set ping content BEFORE sending
+        Content = globalShouldPing and "@everyone" or ""
+        
+        print("[Webhook] Sending batch of", #globalFound, "items, ping:", globalShouldPing)
+        sendWebhookGrouped(globalFound)
+
+        table.clear(globalFound)
+        globalShouldPing = false
+        Content = ""
+    end)
+    
+end
+
+--// SCANNING
+local reported = {}
+local scanQueued = {}
+local plotConns = {}
+
+local function scanPlot(plot)
+    if not plot or not plot.Parent then return end
+    reported[plot] = reported[plot] or {}
+
+    local foundList = {}
+
+    for _, obj in ipairs(plot:GetDescendants()) do
+        if obj:IsA("Model") then
+            local displayName = normalizeBrainrotName(obj.Name)
+            local cleanName = normalizeKey(displayName)
+
+            if brainrotSet[cleanName] then
+                local mutation = getMutation(obj)
+                local trait = getTrait(obj)
+
+                local key = cleanName .. "|" .. (mutation or "None") .. "|" .. (trait or "None")
+                if not reported[plot][key] then
+                    reported[plot][key] = true
+
+                    local rarity = rarityByName[cleanName] or "Unknown"
+                    local cost = costByName[cleanName] or 0
+                    local baseIncome = incomeByName[cleanName] or 0
+
+                    local finalIncome, traitList = computeIncome(baseIncome, mutation, trait)
+                    
+                    if finalIncome >= MIN_INCOME then
+                        local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
+                        local mutationText = mutation or "None"
+                        
+                        local shouldPing = finalIncome >= PING_MIN or PING_NAMES[cleanName]
+                        
+                        if shouldPing then
+                            globalShouldPing = true
+                        end
+
+                        -- Webhook-only mode: Master Bot handles Gist updates
+
+                        local label = ("**%s** | **%s** | 🧬 **%s** | 💰 **$%s** | 🌀 **%s**")
+                            :format(displayName, rarity, mutationText, short(cost), traitText)
+
+                        table.insert(foundList, {
+                            rarity = rarity,
+                            income = finalIncome,
+                            line = label
+                        })
+                    end
+                end
+            end
+        end
+    end
+
+    if #foundList > 0 then
+        for _, line in ipairs(foundList) do
+            table.insert(globalFound, line)
+        end
+        queueWebhookSend()
+        -- ✅ Gist update moved inside shouldPing check above
+        print("[Scanner] Found", #foundList, "brainrots in plot:", plot.Name)
     end
 end
 
--- ══════════════════════════════════════════
---  MAIN
--- ══════════════════════════════════════════
-local function main()
-    local ui = buildGUI()
-
-    ui.closeBtn.MouseButton1Click:Connect(function()
-        ui.gui:Destroy()
-    end)
-
-    local minimized = false
-    ui.minimizeBtn.MouseButton1Click:Connect(function()
-        minimized = not minimized
-        ui.scroll.Visible = not minimized
-        ui.win.Size = minimized
-            and UDim2.new(0,560,0,36)
-            or  UDim2.new(0,560,0,460)
-        ui.minimizeBtn.Text = minimized and "□" or "—"
-    end)
-
-    -- Single shared syncedAt — updated whenever we successfully sync
-    local syncedAt = os.time()
-    local isSyncing = false
-    local lastAutoSync = os.time()
-    local AUTO_RESYNC_INTERVAL = 30
-
-    -- One persistent ticker that reads syncedAt — never respawned
-    task.spawn(function()
-        while ui.gui.Parent do
-            task.wait(1)
-            if not ui.gui.Parent then break end
-            local d = os.time() - syncedAt
-            if d < 5 then
-                ui.statusLbl.Text = "· just now"
-                ui.statusLbl.TextColor3 = T.Green
-            elseif d < 60 then
-                ui.statusLbl.Text = "· "..d.."s ago"
-                ui.statusLbl.TextColor3 = d < 25 and T.Green or T.TextDim
-            elseif d < 3600 then
-                ui.statusLbl.Text = "· "..math.floor(d/60).."m ago"
-                ui.statusLbl.TextColor3 = T.Orange
-            else
-                ui.statusLbl.Text = "· "..math.floor(d/3600).."h ago"
-                ui.statusLbl.TextColor3 = T.Red
-            end
-        end
-    end)
-
-    local function doSync(force)
-        if isSyncing then return end
-        isSyncing = true
-        ui.resyncBtn.Text = "↻"
-        ui.resyncBtn.TextColor3 = T.Yellow
-        ui.resyncBtn.BackgroundColor3 = Color3.fromRGB(40,35,10)
-
-        local newData = fetchGistData()
-        -- Always reset the timer on every sync attempt (success or not)
-        syncedAt = os.time()
-
-        if ui.gui.Parent and newData then
-            if force or newData.timestamp ~= lastKnownTimestamp then
-                lastKnownTimestamp = newData.timestamp
-                updateGUI(ui, newData)
-            end
-        end
-
-        ui.resyncBtn.Text = "↺"
-        ui.resyncBtn.TextColor3 = Color3.fromRGB(74,222,128)
-        ui.resyncBtn.BackgroundColor3 = Color3.fromRGB(18,30,20)
-        isSyncing = false
-        lastAutoSync = os.time()
+local function hookPlot(plot)
+    if plotConns[plot] then
+        plotConns[plot]:Disconnect()
+        plotConns[plot] = nil
     end
 
-    -- Initial load
-    doSync(true)
+    scanPlot(plot)
 
-    -- Manual resync: cancel any ongoing sync so manual always wins
-    ui.resyncBtn.MouseButton1Click:Connect(function()
-        isSyncing = false  -- force unlock so manual click is never dropped
-        task.spawn(function() doSync(true) end)
-    end)
+    plotConns[plot] = plot.DescendantAdded:Connect(function()
+        if scanQueued[plot] then return end
+        scanQueued[plot] = true
 
-    -- Auto loop: check every REFRESH_INTERVAL, force-resync every 30s
-    task.spawn(function()
-        while ui.gui.Parent do
-            task.wait(REFRESH_INTERVAL)
-            if not ui.gui.Parent then break end
-            local shouldForce = (os.time() - lastAutoSync) >= AUTO_RESYNC_INTERVAL
-            task.spawn(function() doSync(shouldForce) end)
-        end
-    end)
-
-    -- Draggable
-    local dragging, dragStart, winStart
-    ui.titleBar.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = inp.Position
-            winStart = ui.win.Position
-            inp.Changed:Connect(function()
-                if inp.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
-        end
-    end)
-    local lastDrag
-    ui.titleBar.InputChanged:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseMovement then lastDrag = inp end
-    end)
-    UserInputService.InputChanged:Connect(function(inp)
-        if inp == lastDrag and dragging then
-            local delta = inp.Position - dragStart
-            ui.win.Position = UDim2.new(
-                winStart.X.Scale, winStart.X.Offset + delta.X,
-                winStart.Y.Scale, winStart.Y.Offset + delta.Y
-            )
-        end
+        task.delay(SCAN_DELAY, function()
+            scanQueued[plot] = nil
+            if plot and plot.Parent then
+                scanPlot(plot)
+            end
+        end)
     end)
 end
 
-main()
+for _, plot in ipairs(plotsFolder:GetChildren()) do
+    hookPlot(plot)
+end
+
+plotsFolder.ChildAdded:Connect(function(plot)
+    task.delay(0.1, function()
+        hookPlot(plot)
+    end)
+end)
+
+plotsFolder.ChildRemoved:Connect(function(plot)
+    reported[plot] = nil
+    scanQueued[plot] = nil
+    if plotConns[plot] then
+        plotConns[plot]:Disconnect()
+        plotConns[plot] = nil
+    end
+end)
+
+-- Webhook-only mode: No Gist management needed
+
+print("[Scanner] Initialized successfully!")
