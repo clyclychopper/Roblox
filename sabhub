@@ -2,7 +2,7 @@
 local plotsFolder = workspace:WaitForChild("Plots")
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
-local Content = ""
+
 
 local WEBHOOK_NORMAL = getgenv().Webhook or error("❌ Webhook not set! Set getgenv().Webhook first")
 local WEBHOOK_PING = getgenv().WebhookPing or error("❌ WebhookPing not set!")
@@ -12,7 +12,10 @@ print("[Config] Webhook:", WEBHOOK_NORMAL and "✅ Set" or "❌ Missing")
 local MIN_INCOME = 10000000
 local SEND_DELAY = 3
 local SCAN_DELAY = 1.5
-local PING_MIN = 300000000
+local PING_MIN = 500000000 
+
+--- 500m ping minimum
+--- 10m normal webhook 
 
 local PING_NAMES = {
     ["Rosetti Tualetti"] = true,
@@ -1526,104 +1529,122 @@ local function sendWebhookGrouped(entries)
         return
     end
 
-    local groups = {}
+    -- Split into ping and normal
+    local pingEntries = {}
+    local normalEntries = {}
     for _, e in ipairs(entries) do
-        local r = e.rarity or "Unknown"
-        groups[r] = groups[r] or {}
-        table.insert(groups[r], e)
+        if e.isPing then
+            table.insert(pingEntries, e)
+        else
+            table.insert(normalEntries, e)
+        end
     end
-
-    local rarities = {}
-    for r,_ in pairs(groups) do table.insert(rarities, r) end
-    table.sort(rarities, function(a,b)
-        return (RARITY_ORDER[a] or 0) > (RARITY_ORDER[b] or 0)
-    end)
 
     local t = os.date("!*t")
     local timestamp = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.min, t.sec)
     local playerCount = #Players:GetPlayers()
 
-    local allEmbeds = {}
+    local function buildAndSend(bucket, targetUrl, withPing)
+        if #bucket == 0 then return end
 
-    for _, rarity in ipairs(rarities) do
-        local bucket = groups[rarity]
-        table.sort(bucket, function(a,b)
-            return (a.income or 0) > (b.income or 0)
+        -- Group by rarity
+        local groups = {}
+        for _, e in ipairs(bucket) do
+            local r = e.rarity or "Unknown"
+            groups[r] = groups[r] or {}
+            table.insert(groups[r], e)
+        end
+
+        local rarities = {}
+        for r,_ in pairs(groups) do table.insert(rarities, r) end
+        table.sort(rarities, function(a,b)
+            return (RARITY_ORDER[a] or 0) > (RARITY_ORDER[b] or 0)
         end)
 
-        local brainrotFields = {}
-        for _, e in ipairs(bucket) do
-            local fname = ("💵 %s/s"):format(short(e.income))
-            local fval = e.line
-            table.insert(brainrotFields, {
-                name = clampStr(fname, 256),
-                value = clampStr(fval, 1024),
-                inline = false
-            })
+        local allEmbeds = {}
+
+        for _, rarity in ipairs(rarities) do
+            local group = groups[rarity]
+            table.sort(group, function(a,b)
+                return (a.income or 0) > (b.income or 0)
+            end)
+
+            local brainrotFields = {}
+            for _, e in ipairs(group) do
+                table.insert(brainrotFields, {
+                    name = clampStr(("💵 %s/s"):format(short(e.income)), 256),
+                    value = clampStr(e.line, 1024),
+                    inline = false
+                })
+            end
+
+            local PER_EMBED_BRAINROT_FIELDS = MAX_FIELDS_PER_EMBED - 2
+            local fieldChunks = chunkArray(brainrotFields, PER_EMBED_BRAINROT_FIELDS)
+
+            for idx, fchunk in ipairs(fieldChunks) do
+                table.insert(fchunk, {
+                    name = "Server ID",
+                    value = "```" .. game.JobId .. "```",
+                    inline = false
+                })
+
+                table.insert(allEmbeds, {
+                    title = (#fieldChunks > 1)
+                        and ("Found Brainrots — %s (%d/%d)"):format(rarity, idx, #fieldChunks)
+                        or  ("Found Brainrots — %s"):format(rarity),
+                    url = "https://www.roblox.com/games/start?placeId=109983668079237&gameInstanceId="..game.JobId,
+                    description = "",
+                    color = RARITY_COLOR[rarity] or RARITY_COLOR["Unknown"],
+                    thumbnail = {url = "https://static.wikia.nocookie.net/stealabr/images/e/e3/Tung_Tung_Tung_Sahur.png/revision/latest?cb=20260125163843"},
+                    footer = {text = player.Name .. " | " .. tostring(playerCount) .. "/8👤"},
+                    fields = fchunk,
+                    timestamp = timestamp
+                })
+            end
         end
 
-        local PER_EMBED_BRAINROT_FIELDS = MAX_FIELDS_PER_EMBED - 2
-        local fieldChunks = chunkArray(brainrotFields, PER_EMBED_BRAINROT_FIELDS)
+        local embedBatches = chunkArray(allEmbeds, MAX_EMBEDS_PER_MESSAGE)
 
-        for idx, fchunk in ipairs(fieldChunks) do
-            table.insert(fchunk, {
-                name = "Server ID",
-                value = "```" .. game.JobId .. "```",
-                inline = false
-            })
+        for i, embedBatch in ipairs(embedBatches) do
+            local payload = {
+                content = (i == 1 and withPing) and "@everyone" or "",
+                username = "Cly Notify",
+                avatar_url = "https://assets.teenvogue.com/photos/5d4daf13b068cf00080a03f7/16:9/w_2560%2Cc_limit/00-story-diddy.jpg",
+                embeds = embedBatch,
+                allowed_mentions = (i == 1 and withPing) and { parse = {"everyone"} } or { parse = {} }
+            }
 
-            table.insert(allEmbeds, {
-                title = (#fieldChunks > 1)
-                    and ("Found Brainrots — %s (%d/%d)"):format(rarity, idx, #fieldChunks)
-                    or ("Found Brainrots — %s"):format(rarity),
-                url = "https://www.roblox.com/games/start?placeId=109983668079237&gameInstanceId="..game.JobId,
-                description = "",
-                color = RARITY_COLOR[rarity] or RARITY_COLOR["Unknown"],
-                thumbnail = {url = "https://static.wikia.nocookie.net/stealabr/images/e/e3/Tung_Tung_Tung_Sahur.png/revision/latest?cb=20260125163843"},
-                footer = {text = player.Name .. " | " .. tostring(playerCount) .. "/8👤"},
-                fields = fchunk,
-                timestamp = timestamp
-            })
+            local success, res = pcall(function()
+                return req({
+                    Url = targetUrl,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = HttpService:JSONEncode(payload)
+                })
+            end)
+
+            if success and res then
+                print("[Webhook] Sent to", withPing and "PING" or "NORMAL", "| Status:", res.StatusCode)
+            else
+                warn("[Webhook] Failed:", res)
+            end
+
+            if i < #embedBatches then
+                task.wait(0.35)
+            end
         end
     end
 
-    local embedBatches = chunkArray(allEmbeds, MAX_EMBEDS_PER_MESSAGE)
+    -- Send ping brainrots to WEBHOOK_PING with @everyone
+    buildAndSend(pingEntries, WEBHOOK_PING, true)
 
-    for i, embedBatch in ipairs(embedBatches) do
-    local contentForThis = (i == 1) and Content or ""
-    local isPingMessage = contentForThis == "@everyone"
-    
-    local targetUrl = isPingMessage and WEBHOOK_PING or WEBHOOK_NORMAL
-    
-    local payload = {
-        content = contentForThis,
-        username = "Cly Notify",
-        avatar_url = "https://assets.teenvogue.com/photos/5d4daf13b068cf00080a03f7/16:9/w_2560%2Cc_limit/00-story-diddy.jpg",
-        embeds = embedBatch,
-        allowed_mentions = (contentForThis ~= "" and { parse = {"everyone"} } or { parse = {} })
-    }
-
-    -- Override sendWebhookPayload to use specific URL
-    local req = getRequest()
-    local success, res = pcall(function()
-        return req({
-            Url = targetUrl,
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode(payload)
-        })
-    end)
-    
-    if success and res then
-        print("[Webhook] Sent to", isPingMessage and "PING" or "NORMAL", "webhook | Status:", res.StatusCode)
-    else
-        warn("[Webhook] Failed:", res)
+    -- Small gap between the two sends
+    if #pingEntries > 0 and #normalEntries > 0 then
+        task.wait(0.5)
     end
 
-    if i < #embedBatches then
-        task.wait(0.35)
-    end
-end
+    -- Send normal brainrots to WEBHOOK_NORMAL silently
+    buildAndSend(normalEntries, WEBHOOK_NORMAL, false)
 end
 
 -- ✅ FIX: Better batch management
@@ -1640,15 +1661,12 @@ local function queueWebhookSend()
         
         if #globalFound == 0 then return end
 
-        -- ✅ FIX: Set ping content BEFORE sending
-        Content = globalShouldPing and "@everyone" or ""
         
         print("[Webhook] Sending batch of", #globalFound, "items, ping:", globalShouldPing)
         sendWebhookGrouped(globalFound)
 
         table.clear(globalFound)
         globalShouldPing = false
-        Content = ""
     end)
     
 end
@@ -1701,7 +1719,8 @@ local function scanPlot(plot)
                         table.insert(foundList, {
                             rarity = rarity,
                             income = finalIncome,
-                            line = label
+                            line = label,
+                            isPing = shouldPing
                         })
                     end
                 end
