@@ -642,8 +642,32 @@ local function updateGUI(ui, data)
         return
     end
 
-    ui.statusLbl.Text = "· "..timeAgo(data.timestamp).." ago"
+    ui.statusLbl.Text = "· just now"
     ui.statusLbl.TextColor3 = T.Green
+
+    -- Fade the status to "X ago" over time
+    local syncedAt = os.time()
+    task.spawn(function()
+        while ui.gui.Parent do
+            task.wait(5)
+            local d = os.time() - syncedAt
+            if d < 60 then
+                ui.statusLbl.Text = "· "..d.."s ago"
+            elseif d < 3600 then
+                ui.statusLbl.Text = "· "..math.floor(d/60).."m ago"
+            else
+                ui.statusLbl.Text = "· "..math.floor(d/3600).."h ago"
+            end
+            -- Color goes dim as it ages
+            if d >= 60 then
+                ui.statusLbl.TextColor3 = T.Orange
+            elseif d >= 25 then
+                ui.statusLbl.TextColor3 = T.TextDim
+            else
+                ui.statusLbl.TextColor3 = T.Green
+            end
+        end
+    end)
 
     for _, ch in ipairs(ui.scroll:GetChildren()) do
         if ch:IsA("Frame") then ch:Destroy() end
@@ -703,19 +727,27 @@ local function main()
     local function doSync(force)
         if isSyncing then return end
         isSyncing = true
+        -- Spinning state
         ui.resyncBtn.Text = "↻"
         ui.resyncBtn.TextColor3 = T.Yellow
+        ui.resyncBtn.BackgroundColor3 = Color3.fromRGB(40,35,10)
+
         local newData = fetchGistData()
         if ui.gui.Parent and newData then
-            -- Update UI if data changed OR forced (resets the "X ago" timer display)
             if force or newData.timestamp ~= lastKnownTimestamp then
                 lastKnownTimestamp = newData.timestamp
                 updateGUI(ui, newData)
-                print("[Viewer] 🔄 Synced" .. (force and " (manual)" or " (new data)"))
+            else
+                -- No new data but still reset the displayed timer
+                ui.statusLbl.Text = "· just now"
+                ui.statusLbl.TextColor3 = T.Green
             end
         end
+
+        -- Restore button to its normal green state
         ui.resyncBtn.Text = "↺"
-        ui.resyncBtn.TextColor3 = T.TextDim
+        ui.resyncBtn.TextColor3 = Color3.fromRGB(74,222,128)
+        ui.resyncBtn.BackgroundColor3 = Color3.fromRGB(18,30,20)
         isSyncing = false
         lastAutoSync = os.time()
     end
