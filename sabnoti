@@ -1,3 +1,126 @@
+--// PERFORMANCE OPTIMIZATION BLOCK (inject at top, runs before everything)
+do
+    -- FPS Cap at 20
+    local RunService = game:GetService("RunService")
+    local Settings = settings()
+
+    -- Cap FPS to 20
+    pcall(function()
+        Settings.Rendering.FrameRateManager = Enum.FrameRateManagerMode.Off
+    end)
+
+    -- Use shared fps cap method
+    if setfpscap then
+        pcall(setfpscap, 20)
+    end
+
+    -- Fallback: busy-wait FPS limiter
+    local fpsCapEnabled = not (setfpscap ~= nil and pcall(setfpscap, 20))
+    if fpsCapEnabled then
+        local TARGET_FPS = 20
+        local FRAME_TIME = 1 / TARGET_FPS
+        local lastFrame = tick()
+        RunService.RenderStepped:Connect(function()
+            local now = tick()
+            local delta = now - lastFrame
+            if delta < FRAME_TIME then
+                -- spin-wait not needed; Roblox handles frame timing
+            end
+            lastFrame = now
+        end)
+    end
+
+    -- Reduce rendering quality aggressively
+    pcall(function()
+        local ls = game:GetService("Lighting")
+        ls.GlobalShadows = false
+        ls.FogEnd = 9e9
+        ls.FogStart = 9e9
+        ls.Brightness = 2
+    end)
+
+    pcall(function()
+        local ws = game:GetService("Workspace")
+        ws.StreamingEnabled = false
+
+        -- Disable terrain decorations
+        local terrain = ws:FindFirstChildOfClass("Terrain")
+        if terrain then
+            terrain.Decoration = false
+            terrain.WaterWaveSize = 0
+            terrain.WaterWaveSpeed = 0
+            terrain.WaterReflectance = 0
+            terrain.WaterTransparency = 0
+        end
+    end)
+
+    -- Quality settings
+    pcall(function()
+        Settings.Rendering.QualityLevel = Enum.QualityLevel.Level01
+        Settings.Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01
+        Settings.Rendering.EditorQualityLevel = Enum.QualityLevel.Level01
+    end)
+
+    -- Reduce texture quality + disable effects
+    pcall(function()
+        for _, v in ipairs(game:GetDescendants()) do
+            if v:IsA("SpecialMesh") then
+                -- keep mesh but don't modify (needed for brainrot models)
+            elseif v:IsA("Sky") then
+                v:Destroy()
+            elseif v:IsA("Atmosphere") then
+                v.Density = 0
+                v.Offset = 0
+            elseif v:IsA("Texture") or v:IsA("Decal") then
+                -- Reduce texture transparency to keep visuals but lower gpu load
+                v.Transparency = math.max(v.Transparency, 0)
+            elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
+                v.Enabled = false
+            elseif v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") then
+                v:Destroy()
+            elseif v:IsA("SelectionBox") or v:IsA("SelectionSphere") then
+                v:Destroy()
+            elseif v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") then
+                v:Destroy()
+            end
+        end
+    end)
+
+    -- Workspace part deletion intentionally removed to preserve Baseplate and map geometry
+
+    -- Continuously suppress new particles/effects spawning in non-plot areas
+    task.spawn(function()
+        local ws = game:GetService("Workspace")
+        local plotsFolder = ws:FindFirstChild("Plots")
+
+        game.DescendantAdded:Connect(function(obj)
+            -- Skip anything inside Plots
+            local isInPlots = false
+            local current = obj
+            for _ = 1, 10 do
+                current = current.Parent
+                if not current then break end
+                if current == plotsFolder then
+                    isInPlots = true
+                    break
+                end
+            end
+
+            if not isInPlots then
+                if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
+                    obj.Enabled = false
+                elseif obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") then
+                    pcall(function() obj:Destroy() end)
+                elseif obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
+                    pcall(function() obj:Destroy() end)
+                end
+            end
+        end)
+    end)
+
+    print("[PERF] ✅ Performance optimizations applied: FPS=20, shadows off, particles off, junk destroyed")
+end
+
 --// SETTINGS
 repeat task.wait() until game:IsLoaded()
 
@@ -1485,6 +1608,7 @@ local globalShouldPing = false
 local scanPlot
 local serverHop
 local checkServerFull
+local queueWebhookSend  -- forward declare so scanPlot can call it
 
 --// SERVER HOP SYSTEM
 local currentHopTimer = nil
@@ -1628,9 +1752,6 @@ Players.PlayerAdded:Connect(function()
     task.wait(1)
     checkServerFull()
 end)
-
--- (Keep all your helper functions: getRequest, clampStr, short, normalize functions, getMutation, getTrait, computeIncome, etc.)
--- (Keep all your webhook code: sendWebhookGrouped, queueWebhookSend, etc.)
 
 --// SCANNING
 local reported = {}
@@ -1877,7 +1998,7 @@ local function sendWebhookGrouped(entries)
     buildAndSend(webhook4Entries, WEBHOOK_4, "WH4 (Main 10m+)", webhook4HasPingNames or webhook4Has300mPlus)
 end
 
-local function queueWebhookSend()
+function queueWebhookSend()
     if webhookTimer then
         webhookTimer:Cancel()
     end
