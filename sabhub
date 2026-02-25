@@ -4,15 +4,19 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
 
-local WEBHOOK_NORMAL = getgenv().Webhook or error("❌ Webhook not set! Set getgenv().Webhook first")
-local WEBHOOK_PING = getgenv().WebhookPing or error("❌ WebhookPing not set!")
+local WEBHOOK_1 = getgenv().Webhook1 or error("❌ Webhook1 not set!")  -- 1m-50m (no ping names)
+local WEBHOOK_2 = getgenv().Webhook2 or error("❌ Webhook2 not set!")  -- 50m-500m (no ping names)
+local WEBHOOK_3 = getgenv().Webhook3 or error("❌ Webhook3 not set!")  -- ping names + 500m+
+local WEBHOOK_4 = getgenv().Webhook4 or error("❌ Webhook4 not set!")  -- everything 10m+
 
 -- Debug: Print credentials status
 print("[Config] Webhook:", WEBHOOK_NORMAL and "✅ Set" or "❌ Missing")
-local MIN_INCOME = 10000000
+local MIN_INCOME = 1000000  -- 1m minimum for webhook 1
+local WEBHOOK_4_MIN = 10000000  -- 10m minimum for webhook 4
+local MID_THRESHOLD = 50000000  -- 50m
+local HIGH_THRESHOLD = 500000000  -- 500m
 local SEND_DELAY = 3
 local SCAN_DELAY = 1.5
-local PING_MIN = 500000000 
 
 --- 500m ping minimum
 --- 10m normal webhook 
@@ -1529,14 +1533,43 @@ local function sendWebhookGrouped(entries)
         return
     end
 
-    -- Split into ping and normal
-    local pingEntries = {}
-    local normalEntries = {}
+    -- Categorize entries (items can go to multiple webhooks)
+    local webhook1Entries = {}  -- 1m-50m, no ping names
+    local webhook2Entries = {}  -- 50m-500m, no ping names
+    local webhook3Entries = {}  -- ping names OR 500m+
+    local webhook4Entries = {}  -- everything 10m+
+    
+    local webhook4HasPingNames = false
+    local webhook4Has300mPlus = false
+
     for _, e in ipairs(entries) do
-        if e.isPing then
-            table.insert(pingEntries, e)
-        else
-            table.insert(normalEntries, e)
+        local income = e.income or 0
+        local isPingName = e.isPingName or false
+        
+        -- Webhook 3: ping names OR 500m+
+        if isPingName or income >= HIGH_THRESHOLD then
+            table.insert(webhook3Entries, e)
+        end
+        
+        -- Webhook 1: 1m-50m, exclude ping names
+        if income >= MIN_INCOME and income < MID_THRESHOLD and not isPingName then
+            table.insert(webhook1Entries, e)
+        end
+        
+        -- Webhook 2: 50m-500m, exclude ping names
+        if income >= MID_THRESHOLD and income < HIGH_THRESHOLD and not isPingName then
+            table.insert(webhook2Entries, e)
+        end
+        
+        -- Webhook 4: everything 10m+
+        if income >= WEBHOOK_4_MIN then
+            table.insert(webhook4Entries, e)
+            if isPingName then
+                webhook4HasPingNames = true
+            end
+            if income >= 300000000 then  -- 300m+
+                webhook4Has300mPlus = true
+            end
         end
     end
 
@@ -1544,7 +1577,7 @@ local function sendWebhookGrouped(entries)
     local timestamp = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.min, t.sec)
     local playerCount = #Players:GetPlayers()
 
-    local function buildAndSend(bucket, targetUrl, withPing)
+    local function buildAndSend(bucket, targetUrl, webhookName, shouldPing)
         if #bucket == 0 then return end
 
         -- Group by rarity
@@ -1607,11 +1640,11 @@ local function sendWebhookGrouped(entries)
 
         for i, embedBatch in ipairs(embedBatches) do
             local payload = {
-                content = (i == 1 and withPing) and "@everyone" or "",
-                username = "Cly Notify",
+                content = (i == 1 and shouldPing) and "@everyone" or "",
+                username = "Cly Notify [" .. webhookName .. "]",
                 avatar_url = "https://assets.teenvogue.com/photos/5d4daf13b068cf00080a03f7/16:9/w_2560%2Cc_limit/00-story-diddy.jpg",
                 embeds = embedBatch,
-                allowed_mentions = (i == 1 and withPing) and { parse = {"everyone"} } or { parse = {} }
+                allowed_mentions = (i == 1 and shouldPing) and { parse = {"everyone"} } or { parse = {} }
             }
 
             local success, res = pcall(function()
@@ -1624,7 +1657,7 @@ local function sendWebhookGrouped(entries)
             end)
 
             if success and res then
-                print("[Webhook] Sent to", withPing and "PING" or "NORMAL", "| Status:", res.StatusCode)
+                print("[Webhook] Sent to", webhookName, "| Status:", res.StatusCode, "| Items:", #bucket)
             else
                 warn("[Webhook] Failed:", res)
             end
@@ -1635,16 +1668,21 @@ local function sendWebhookGrouped(entries)
         end
     end
 
-    -- Send ping brainrots to WEBHOOK_PING with @everyone
-    buildAndSend(pingEntries, WEBHOOK_PING, true)
-
-    -- Small gap between the two sends
-    if #pingEntries > 0 and #normalEntries > 0 then
-        task.wait(0.5)
-    end
-
-    -- Send normal brainrots to WEBHOOK_NORMAL silently
-    buildAndSend(normalEntries, WEBHOOK_NORMAL, false)
+    -- Send to all webhooks in sequence
+    buildAndSend(webhook1Entries, WEBHOOK_1, "WH1 (1m-50m)", false)
+    
+    if #webhook1Entries > 0 then task.wait(0.5) end
+    
+    buildAndSend(webhook2Entries, WEBHOOK_2, "WH2 (50m-500m)", false)
+    
+    if #webhook2Entries > 0 then task.wait(0.5) end
+    
+    buildAndSend(webhook3Entries, WEBHOOK_3, "WH3 (Ping+500m)", true)  -- Always @everyone
+    
+    if #webhook3Entries > 0 then task.wait(0.5) end
+    
+    -- Webhook 4: @everyone if has ping names OR 300m+ income
+    buildAndSend(webhook4Entries, WEBHOOK_4, "WH4 (Main 10m+)", webhook4HasPingNames or webhook4Has300mPlus)
 end
 
 -- ✅ FIX: Better batch management
@@ -1704,8 +1742,8 @@ local function scanPlot(plot)
                     if finalIncome >= MIN_INCOME then
                         local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
                         local mutationText = mutation or "None"
-                        
-                        local shouldPing = finalIncome >= PING_MIN or PING_NAMES[cleanName]
+    
+                        local isPingName = PING_NAMES[cleanName] or false
                         
                         if shouldPing then
                             globalShouldPing = true
@@ -1720,7 +1758,7 @@ local function scanPlot(plot)
                             rarity = rarity,
                             income = finalIncome,
                             line = label,
-                            isPing = shouldPing
+                            isPing = isPingName
                         })
                     end
                 end
