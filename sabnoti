@@ -1,8 +1,23 @@
 --// SETTINGS
-local plotsFolder = workspace:WaitForChild("Plots")
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+repeat task.wait() until game:IsLoaded()
 
+local plotsFolder = workspace:FindFirstChild("Plots")
+if not plotsFolder then
+    warn("⚠️ Plots folder not found, waiting...")
+    plotsFolder = workspace:WaitForChild("Plots", 30)
+    if not plotsFolder then
+        error("❌ Plots folder never appeared!")
+    end
+end
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+
+local player = Players.LocalPlayer
+if not player then
+    player = Players.PlayerAdded:Wait()
+end
 
 local WEBHOOK_1 = getgenv().Webhook1 or error("❌ Webhook1 not set!")  -- 1m-50m (no ping names)
 local WEBHOOK_2 = getgenv().Webhook2 or error("❌ Webhook2 not set!")  -- 50m-500m (no ping names)
@@ -10,7 +25,9 @@ local WEBHOOK_3 = getgenv().Webhook3 or error("❌ Webhook3 not set!")  -- ping 
 local WEBHOOK_4 = getgenv().Webhook4 or error("❌ Webhook4 not set!")  -- everything 10m+
 
 -- Debug: Print credentials status
-print("[Config] Webhook:", WEBHOOK_NORMAL and "✅ Set" or "❌ Missing")
+print("[Config] ✅ All 4 webhooks configured")
+print("[Config] Player:", player.Name)
+print("[Config] Plots found:", #plotsFolder:GetChildren())
 local MIN_INCOME = 5000000  -- 5m minimum for webhook 1
 local WEBHOOK_4_MIN = 10000000  -- 10m minimum for webhook 4
 local MID_THRESHOLD = 50000000  -- 50m
@@ -18,6 +35,19 @@ local PING_THRESHOLD = 100000000  -- 100m threshold for ping names
 local HIGH_THRESHOLD = 500000000  -- 500m
 local SEND_DELAY = 3
 local SCAN_DELAY = 1.5
+
+local HOP_TIMERS = {
+    NONE = 600,      -- 10 minutes (no brainrots)
+    LOW = 300,       -- 5 minutes (5m-50m)
+    MID = 180,        -- 1 minute (50m-500m)
+    HIGH = 3         -- 3 seconds (500m+ or ping names)
+}
+
+local MAX_PLAYERS = 8
+
+local currentHopTimer = nil
+local hopStartTime = 0
+local currentTimerDuration = HOP_TIMERS.NONE
 
 local PING_NAMES = {
     ["Rosetti Tualetti"] = true,
@@ -64,8 +94,6 @@ local PING_NAMES = {
     ["Noo my Heart"] = true
 
 }
-
-local globalShouldPing = false
 
 local brainrots = {
 -- God
@@ -1322,69 +1350,36 @@ local traitAliases = {
     ["SleepySleepy"] = "Sleepy",
 }
 
---// WEBHOOK ONLY MODE (Gist handled by Master Bot)
-local HttpService = game:GetService("HttpService")
-
+--// HELPER FUNCTIONS
 local function getRequest()
-    return (syn and syn.request)
-        or (http and http.request)
-        or http_request
-        or request
+    return (syn and syn.request) or (http and http.request) or http_request or request
 end
 
---// HELPERS
 local function clampStr(s, maxLen)
     s = tostring(s or "")
-    if #s > maxLen then
-        return s:sub(1, maxLen - 3) .. "..."
-    end
-    return s
+    return #s > maxLen and s:sub(1, maxLen - 3) .. "..." or s
 end
 
 local function short(n)
     n = tonumber(n) or 0
     local abs = math.abs(n)
-    local suffixes = {
-        {1e12, "T"},
-        {1e9, "B"},
-        {1e6, "M"},
-        {1e3, "K"}
-    }
+    local suffixes = {{1e12, "T"}, {1e9, "B"}, {1e6, "M"}, {1e3, "K"}}
     for _, s in ipairs(suffixes) do
-        local value, suffix = s[1], s[2]
-        if abs >= value then
-            local num = n / value
-            return string.format("%.2f", num):gsub("%.00$", "") .. suffix
+        if abs >= s[1] then
+            return string.format("%.2f", n / s[1]):gsub("%.00$", "") .. s[2]
         end
     end
     return tostring(n)
 end
 
 local function normalizeMutation(m)
-    m = tostring(m or "Default")
-    m = m:gsub("%s+", "")
-    local map = {
-        default = "Default",
-        gold = "Gold",
-        diamond = "Diamond",
-        bloodrot = "Bloodrot",
-        candy = "Candy",
-        lava = "Lava",
-        galaxy = "Galaxy",
-        yinyang = "YinYang",
-        radioactive = "Radioactive",
-        cursed = "Cursed",
-        divine = "Divine",
-        rainbow = "Rainbow",
-    }
+    m = tostring(m or "Default"):gsub("%s+", "")
+    local map = {default="Default", gold="Gold", diamond="Diamond", bloodrot="Bloodrot", candy="Candy", lava="Lava", galaxy="Galaxy", yinyang="YinYang", radioactive="Radioactive", cursed="Cursed", divine="Divine", rainbow="Rainbow"}
     return map[m:lower()] or m
 end
 
 local function normalizeBrainrotName(raw)
-    raw = tostring(raw or "")
-    raw = raw:gsub("%b[]", "")
-    raw = raw:gsub("%b()", "")
-    raw = raw:gsub("^%s+", ""):gsub("%s+$", "")
+    raw = tostring(raw or ""):gsub("%b[]", ""):gsub("%b()", ""):gsub("^%s+", ""):gsub("%s+$", "")
     return raw
 end
 
@@ -1408,29 +1403,23 @@ end
 local function getMutation(obj)
     if not obj then return nil end
     local attr = obj:GetAttribute("Mutation")
-    if attr ~= nil then return tostring(attr) end
+    if attr then return tostring(attr) end
     local v = obj:FindFirstChild("Mutation")
     if v and v:IsA("ValueBase") then return tostring(v.Value) end
     for _, d in ipairs(obj:GetDescendants()) do
-        if d.Name == "Mutation" and d:IsA("ValueBase") then
-            return tostring(d.Value)
-        end
+        if d.Name == "Mutation" and d:IsA("ValueBase") then return tostring(d.Value) end
     end
-    local tag = obj.Name:match("%[(.-)%]") or obj.Name:match("%((.-)%)")
-    if tag then return tag end
-    return nil
+    return obj.Name:match("%[(.-)%]") or obj.Name:match("%((.-)%)")
 end
 
 local function getTrait(obj)
     if not obj then return nil end
     local attr = obj:GetAttribute("Traits")
-    if attr ~= nil then return tostring(attr) end
+    if attr then return tostring(attr) end
     local v = obj:FindFirstChild("Traits")
     if v and v:IsA("ValueBase") then return tostring(v.Value) end
     for _, d in ipairs(obj:GetDescendants()) do
-        if d.Name == "Traits" and d:IsA("ValueBase") then
-            return tostring(d.Value)
-        end
+        if d.Name == "Traits" and d:IsA("ValueBase") then return tostring(d.Value) end
     end
     return nil
 end
@@ -1440,51 +1429,32 @@ local function computeIncome(baseIncome, mutation, traitString)
     mutation = normalizeMutation(mutation)
     local mMult = mutationMultipliers[mutation] or 1
     local rawTraits = parseTraits(traitString)
-    local traitMults = {}
-    local displayTraits = {}
-    local seen = {}
-
+    local traitMults, displayTraits, seen = {}, {}, {}
+    
     for _, rawTrait in ipairs(rawTraits) do
         local tName = traitAliases[rawTrait] or rawTrait
         local tMult = traits[tName]
-        if tMult then
-            table.insert(traitMults, tMult)
-        else
-            warn("[Brainrot] Unknown trait:", rawTrait, "mapped:", tName)
-        end
+        if tMult then table.insert(traitMults, tMult) end
         if not seen[tName] then
             seen[tName] = true
             table.insert(displayTraits, tName)
         end
     end
-
-    if #traitMults == 0 then
-        return math.floor(base * mMult), displayTraits
-    end
-
-    -- If NO mutation (mMult == 1), traits add directly
-    -- If mutation exists, use additive stacking with -1 reduction
-    local hasMutation = mMult > 1
     
-    if hasMutation then
-        -- Combine mutation and traits, then apply additive stacking
+    if #traitMults == 0 then return math.floor(base * mMult), displayTraits end
+    
+    if mMult > 1 then
         table.insert(traitMults, mMult)
         table.sort(traitMults, function(a,b) return a > b end)
-        
         local sum = traitMults[1]
         for i = 2, #traitMults do
             local reduced = traitMults[i] - 1
-            if reduced > 0 then
-                sum += reduced
-            end
+            if reduced > 0 then sum += reduced end
         end
         return math.floor(base * sum), displayTraits
     else
-        -- No mutation: traits add directly without -1 reduction
         local sum = 0
-        for _, mult in ipairs(traitMults) do
-            sum += mult
-        end
+        for _, mult in ipairs(traitMults) do sum += mult end
         return math.floor(base * sum), displayTraits
     end
 end
@@ -1495,15 +1465,9 @@ for _, n in ipairs(brainrots) do
     brainrotSet[normalizeKey(n)] = true
 end
 
-local function normKey(s)
-    return normalizeKey(s)
-end
-
 local function normalizeMap(map)
     local out = {}
-    for k, v in pairs(map) do
-        out[normKey(k)] = v
-    end
+    for k, v in pairs(map) do out[normalizeKey(k)] = v end
     return out
 end
 
@@ -1512,222 +1476,175 @@ costByName = normalizeMap(costByName)
 incomeByName = normalizeMap(incomeByName)
 
 local newPing = {}
-for name,_ in pairs(PING_NAMES) do
-    newPing[normKey(name)] = true
-end
+for name,_ in pairs(PING_NAMES) do newPing[normalizeKey(name)] = true end
 PING_NAMES = newPing
 
---// WEBHOOK
-local MAX_FIELDS_PER_EMBED = 25
-local MAX_EMBEDS_PER_MESSAGE = 10
+--// WEBHOOK ONLY MODE (Gist handled by Master Bot)
+local globalShouldPing = false
 
-local function chunkArray(arr, chunkSize)
-    local out = {}
-    for i = 1, #arr, chunkSize do
-        local chunk = {}
-        for j = i, math.min(i + chunkSize - 1, #arr) do
-            table.insert(chunk, arr[j])
-        end
-        table.insert(out, chunk)
+local scanPlot
+local serverHop
+local checkServerFull
+
+--// SERVER HOP SYSTEM
+local currentHopTimer = nil
+local hopStartTime = tick()
+local currentTimerDuration = HOP_TIMERS.NONE
+
+
+--// SERVER HOP SYSTEM
+local function getTimeRemaining()
+    if not currentHopTimer or not currentTimerDuration then 
+        return HOP_TIMERS.NONE
     end
-    return out
+    local elapsed = tick() - hopStartTime
+    return math.max(0, currentTimerDuration - elapsed)
 end
 
-local function sendWebhookGrouped(entries)
-    if type(entries) ~= "table" or #entries == 0 then return end
-
-    local req = getRequest()
-    if not req then
-        warn("[Webhook] No request function found")
+local function updateHopTimer(newDuration, reason)
+    local remaining = getTimeRemaining()
+    
+    if not remaining or not newDuration then
+        warn("[HOP] ⚠️ Invalid timer values")
         return
     end
-
-    -- Categorize entries (items can go to multiple webhooks)
-    local webhook1Entries = {}  -- 1m-50m, no ping names
-    local webhook2Entries = {}  -- 50m-500m, no ping names
-    local webhook3Entries = {}  -- ping names OR 500m+
-    local webhook4Entries = {}  -- everything 10m+
     
-    local webhook4HasPingNames = false
-    local webhook4Has300mPlus = false
-
-    for _, e in ipairs(entries) do
-        local income = e.income or 0
-        local isPingName = e.isPingName or false
-    
-    -- Webhook 3: (ping names with 100m+ income) OR (non-ping 500m+)
-        if (isPingName and income >= PING_THRESHOLD) or (not isPingName and income >= HIGH_THRESHOLD) then
-            table.insert(webhook3Entries, e)
-        end
-    
-    -- Webhook 1: 5m-50m, exclude ALL ping names
-        if income >= MIN_INCOME and income < MID_THRESHOLD and not isPingName then
-            table.insert(webhook1Entries, e)
-        end
-    
-    -- Webhook 2: (50m-500m, no ping names) OR (ping names below 100m)
-        if (income >= MID_THRESHOLD and income < HIGH_THRESHOLD and not isPingName) or (isPingName and income < PING_THRESHOLD) then
-             table.insert(webhook2Entries, e)
+    if newDuration < remaining then
+        if currentHopTimer then
+            currentHopTimer:Cancel()
         end
         
-        -- Webhook 4: everything 10m+
-        if income >= WEBHOOK_4_MIN then
-            table.insert(webhook4Entries, e)
-            if isPingName then
-                webhook4HasPingNames = true
-            end
-            if income >= 300000000 then  -- 300m+
-                webhook4Has300mPlus = true
-            end
-        end
-    end
-
-    local t = os.date("!*t")
-    local timestamp = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.min, t.sec)
-    local playerCount = #Players:GetPlayers()
-
-    local function buildAndSend(bucket, targetUrl, webhookName, shouldPing)
-        if #bucket == 0 then return end
-
-        -- Group by rarity
-        local groups = {}
-        for _, e in ipairs(bucket) do
-            local r = e.rarity or "Unknown"
-            groups[r] = groups[r] or {}
-            table.insert(groups[r], e)
-        end
-
-        local rarities = {}
-        for r,_ in pairs(groups) do table.insert(rarities, r) end
-        table.sort(rarities, function(a,b)
-            return (RARITY_ORDER[a] or 0) > (RARITY_ORDER[b] or 0)
+        currentTimerDuration = newDuration
+        hopStartTime = tick()
+        
+        print(string.format(
+            "[HOP] ⏰ Timer: %.1f min → %.1f min | %s",
+            remaining / 60, newDuration / 60, reason
+        ))
+        
+        currentHopTimer = task.delay(newDuration, function()
+            print("[HOP] ⏰ Timer expired!")
+            serverHop()
         end)
-
-        local allEmbeds = {}
-
-        for _, rarity in ipairs(rarities) do
-            local group = groups[rarity]
-            table.sort(group, function(a,b)
-                return (a.income or 0) > (b.income or 0)
-            end)
-
-            local brainrotFields = {}
-            for _, e in ipairs(group) do
-                table.insert(brainrotFields, {
-                    name = clampStr(("💵 %s/s"):format(short(e.income)), 256),
-                    value = clampStr(e.line, 1024),
-                    inline = false
-                })
-            end
-
-            local PER_EMBED_BRAINROT_FIELDS = MAX_FIELDS_PER_EMBED - 2
-            local fieldChunks = chunkArray(brainrotFields, PER_EMBED_BRAINROT_FIELDS)
-
-            for idx, fchunk in ipairs(fieldChunks) do
-                table.insert(fchunk, {
-                    name = "Server ID",
-                    value = "```" .. game.JobId .. "```",
-                    inline = false
-                })
-
-                table.insert(allEmbeds, {
-                    title = (#fieldChunks > 1)
-                        and ("Found Brainrots — %s (%d/%d)"):format(rarity, idx, #fieldChunks)
-                        or  ("Found Brainrots — %s"):format(rarity),
-                    url = "https://www.roblox.com/games/start?placeId=109983668079237&gameInstanceId="..game.JobId,
-                    description = "",
-                    color = RARITY_COLOR[rarity] or RARITY_COLOR["Unknown"],
-                    thumbnail = {url = "https://static.wikia.nocookie.net/stealabr/images/e/e3/Tung_Tung_Tung_Sahur.png/revision/latest?cb=20260125163843"},
-                    footer = {text = player.Name .. " | " .. tostring(playerCount) .. "/8👤"},
-                    fields = fchunk,
-                    timestamp = timestamp
-                })
-            end
-        end
-
-        local embedBatches = chunkArray(allEmbeds, MAX_EMBEDS_PER_MESSAGE)
-
-        for i, embedBatch in ipairs(embedBatches) do
-            local payload = {
-                content = (i == 1 and shouldPing) and "@everyone" or "",
-                username = "Cly Notify",
-                avatar_url = "https://assets.teenvogue.com/photos/5d4daf13b068cf00080a03f7/16:9/w_2560%2Cc_limit/00-story-diddy.jpg",
-                embeds = embedBatch,
-                allowed_mentions = (i == 1 and shouldPing) and { parse = {"everyone"} } or { parse = {} }
-            }
-
-            local success, res = pcall(function()
-                return req({
-                    Url = targetUrl,
-                    Method = "POST",
-                    Headers = { ["Content-Type"] = "application/json" },
-                    Body = HttpService:JSONEncode(payload)
-                })
-            end)
-
-            if success and res then
-                print("[Webhook] Sent to", webhookName, "| Status:", res.StatusCode, "| Items:", #bucket)
-            else
-                warn("[Webhook] Failed:", res)
-            end
-
-            if i < #embedBatches then
-                task.wait(0.35)
-            end
-        end
+    else
+        print(string.format(
+            "[HOP] ⏸️ Timer kept: %.1f min | %s",
+            remaining / 60, reason
+        ))
     end
-
-    -- Send to all webhooks in sequence
-    buildAndSend(webhook1Entries, WEBHOOK_1, "WH1 (1m-50m)", false)
-    
-    if #webhook1Entries > 0 then task.wait(0.5) end
-    
-    buildAndSend(webhook2Entries, WEBHOOK_2, "WH2 (50m-500m)", false)
-    
-    if #webhook2Entries > 0 then task.wait(0.5) end
-    
-    buildAndSend(webhook3Entries, WEBHOOK_3, "WH3 (Ping+500m)", true)  -- Always @everyone
-    
-    if #webhook3Entries > 0 then task.wait(0.5) end
-    
-    -- Webhook 4: @everyone if has ping names OR 300m+ income
-    buildAndSend(webhook4Entries, WEBHOOK_4, "WH4 (Main 10m+)", webhook4HasPingNames or webhook4Has300mPlus)
 end
 
--- ✅ FIX: Better batch management
-local globalFound = {}
-local webhookTimer = nil
-
-local function queueWebhookSend()
-    if webhookTimer then
-        webhookTimer:Cancel()
+function serverHop()
+    print("\n🔄 [HOP] Initiating server hop...")
+    print("[HOP] Ensuring all plots are scanned...")
+    
+    for _, plot in ipairs(plotsFolder:GetChildren()) do
+        if plot and plot.Parent then
+            pcall(function() scanPlot(plot) end)
+        end
     end
     
-    webhookTimer = task.delay(SEND_DELAY, function()
-        webhookTimer = nil
+    task.wait(2)
+    
+    local success, errorMsg = pcall(function()
+        local placeId = game.PlaceId
+        local servers = {}
         
-        if #globalFound == 0 then return end
-
+        print("[HOP] Fetching server list...")
+        local cursor = ""
+        local attempts = 0
         
-        print("[Webhook] Sending batch of", #globalFound, "items, ping:", globalShouldPing)
-        sendWebhookGrouped(globalFound)
-
-        table.clear(globalFound)
-        globalShouldPing = false
+        repeat
+            attempts += 1
+            if attempts > 3 then break end
+            
+            local url = string.format(
+                "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100&cursor=%s",
+                placeId, cursor
+            )
+            
+            local response = game:HttpGet(url)
+            local data = HttpService:JSONDecode(response)
+            
+            for _, server in ipairs(data.data) do
+                if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                    table.insert(servers, server.id)
+                end
+            end
+            
+            cursor = data.nextPageCursor or ""
+        until cursor == ""
+        
+        if #servers > 0 then
+            local randomServer = servers[math.random(1, #servers)]
+            print(string.format("[HOP] Found %d servers. Teleporting...", #servers))
+            TeleportService:TeleportToPlaceInstance(placeId, randomServer, player)
+        else
+            warn("[HOP] No servers found, rejoining...")
+            TeleportService:Teleport(placeId, player)
+        end
     end)
     
+    if not success then
+        warn("[HOP] Failed:", errorMsg)
+        TeleportService:Teleport(game.PlaceId, player)
+    end
 end
+
+function checkServerFull()
+    local playerCount = #Players:GetPlayers()
+    if playerCount >= MAX_PLAYERS then
+        print(string.format("[HOP] ⚠️ Server full (%d/%d players)", playerCount, MAX_PLAYERS))
+        updateHopTimer(HOP_TIMERS.MID, "Server full")
+        return true
+    end
+    return false
+end
+
+-- Start initial timer
+task.wait(0.1)
+currentHopTimer = task.delay(HOP_TIMERS.NONE, function()
+    print("[HOP] ⏰ Initial timer expired")
+    serverHop()
+end)
+
+print(string.format("[HOP] ✅ Started: %.1f minutes", HOP_TIMERS.NONE / 60))
+
+-- Status monitor
+task.spawn(function()
+    while true do
+        task.wait(30)
+        local remaining = getTimeRemaining()
+        local playerCount = #Players:GetPlayers()
+        print(string.format(
+            "[HOP] 📊 Time: %.1f min | Players: %d/%d",
+            remaining / 60, playerCount, MAX_PLAYERS
+        ))
+    end
+end)
+
+-- Monitor player count
+Players.PlayerAdded:Connect(function()
+    task.wait(1)
+    checkServerFull()
+end)
+
+-- (Keep all your helper functions: getRequest, clampStr, short, normalize functions, getMutation, getTrait, computeIncome, etc.)
+-- (Keep all your webhook code: sendWebhookGrouped, queueWebhookSend, etc.)
 
 --// SCANNING
 local reported = {}
 local scanQueued = {}
 local plotConns = {}
+local globalFound = {}
+local webhookTimer = nil
 
-local function scanPlot(plot)
+function scanPlot(plot)
     if not plot or not plot.Parent then return end
     reported[plot] = reported[plot] or {}
 
     local foundList = {}
+    local shouldHopImmediate = false
 
     for _, obj in ipairs(plot:GetDescendants()) do
         if obj:IsA("Model") then
@@ -1751,14 +1668,27 @@ local function scanPlot(plot)
                     if finalIncome >= MIN_INCOME then
                         local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
                         local mutationText = mutation or "None"
-    
                         local isPingName = PING_NAMES[cleanName] or false
-                        
-                        if shouldPing then
-                            globalShouldPing = true
+
+                        if isPingName or finalIncome >= HIGH_THRESHOLD then
+                            shouldHopImmediate = true
+                            print(string.format(
+                                "[HOP] 🚨 HIGH VALUE: %s (%.0fm/s) - Hopping ASAP!",
+                                displayName, finalIncome / 1000000
+                            ))
+                        elseif finalIncome >= PING_THRESHOLD then
+                            updateHopTimer(HOP_TIMERS.MID, string.format(
+                                "100m+ brainrot: %s", displayName
+                            ))
+                        elseif finalIncome >= WEBHOOK_4_MIN then
+                            updateHopTimer(HOP_TIMERS.LOW, string.format(
+                                "10m+ brainrot: %s", displayName
+                            ))
                         end
 
-                        -- Webhook-only mode: Master Bot handles Gist updates
+                        if isPingName then
+                            globalShouldPing = true
+                        end
 
                         local label = ("**%s** | **%s** | 🧬 **%s** | 💰 **$%s** | 🌀 **%s**")
                             :format(displayName, rarity, mutationText, short(cost), traitText)
@@ -1767,7 +1697,7 @@ local function scanPlot(plot)
                             rarity = rarity,
                             income = finalIncome,
                             line = label,
-                            isPing = isPingName
+                            isPingName = isPingName
                         })
                     end
                 end
@@ -1780,23 +1710,203 @@ local function scanPlot(plot)
             table.insert(globalFound, line)
         end
         queueWebhookSend()
-        -- ✅ Gist update moved inside shouldPing check above
-        print("[Scanner] Found", #foundList, "brainrots in plot:", plot.Name)
+        
+        print(string.format("[Scanner] ✅ Found %d brainrots in %s", #foundList, plot.Name))
+        
+        checkServerFull()
+        
+        if shouldHopImmediate then
+            print("[HOP] 🚀 Immediate hop in 3s...")
+            task.delay(HOP_TIMERS.HIGH, function()
+                serverHop()
+            end)
+        end
     end
 end
 
+--// WEBHOOK FUNCTIONS
+local MAX_FIELDS_PER_EMBED = 25
+local MAX_EMBEDS_PER_MESSAGE = 10
+
+local function chunkArray(arr, chunkSize)
+    local out = {}
+    for i = 1, #arr, chunkSize do
+        local chunk = {}
+        for j = i, math.min(i + chunkSize - 1, #arr) do
+            table.insert(chunk, arr[j])
+        end
+        table.insert(out, chunk)
+    end
+    return out
+end
+
+local function sendWebhookGrouped(entries)
+    if type(entries) ~= "table" or #entries == 0 then return end
+    
+    local req = getRequest()
+    if not req then
+        warn("[Webhook] No request function found")
+        return
+    end
+    
+    local webhook1Entries = {}
+    local webhook2Entries = {}
+    local webhook3Entries = {}
+    local webhook4Entries = {}
+    local webhook4HasPingNames = false
+    local webhook4Has300mPlus = false
+    
+    for _, e in ipairs(entries) do
+        local income = e.income or 0
+        local isPingName = e.isPingName or false
+        
+        if (isPingName and income >= PING_THRESHOLD) or (not isPingName and income >= HIGH_THRESHOLD) then
+            table.insert(webhook3Entries, e)
+        end
+        
+        if income >= MIN_INCOME and income < MID_THRESHOLD and not isPingName then
+            table.insert(webhook1Entries, e)
+        end
+        
+        if (income >= MID_THRESHOLD and income < HIGH_THRESHOLD and not isPingName) or (isPingName and income < PING_THRESHOLD) then
+            table.insert(webhook2Entries, e)
+        end
+        
+        if income >= WEBHOOK_4_MIN then
+            table.insert(webhook4Entries, e)
+            if isPingName then webhook4HasPingNames = true end
+            if income >= 300000000 then webhook4Has300mPlus = true end
+        end
+    end
+    
+    local t = os.date("!*t")
+    local timestamp = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.min, t.sec)
+    local playerCount = #Players:GetPlayers()
+    
+    local function buildAndSend(bucket, targetUrl, webhookName, shouldPing)
+        if #bucket == 0 then return end
+        
+        local groups = {}
+        for _, e in ipairs(bucket) do
+            local r = e.rarity or "Unknown"
+            groups[r] = groups[r] or {}
+            table.insert(groups[r], e)
+        end
+        
+        local rarities = {}
+        for r,_ in pairs(groups) do table.insert(rarities, r) end
+        table.sort(rarities, function(a,b) return (RARITY_ORDER[a] or 0) > (RARITY_ORDER[b] or 0) end)
+        
+        local allEmbeds = {}
+        
+        for _, rarity in ipairs(rarities) do
+            local group = groups[rarity]
+            table.sort(group, function(a,b) return (a.income or 0) > (b.income or 0) end)
+            
+            local brainrotFields = {}
+            for _, e in ipairs(group) do
+                table.insert(brainrotFields, {
+                    name = clampStr(("💵 %s/s"):format(short(e.income)), 256),
+                    value = clampStr(e.line, 1024),
+                    inline = false
+                })
+            end
+            
+            local PER_EMBED_BRAINROT_FIELDS = MAX_FIELDS_PER_EMBED - 2
+            local fieldChunks = chunkArray(brainrotFields, PER_EMBED_BRAINROT_FIELDS)
+            
+            for idx, fchunk in ipairs(fieldChunks) do
+                table.insert(fchunk, {
+                    name = "Server ID",
+                    value = "```" .. game.JobId .. "```",
+                    inline = false
+                })
+                
+                table.insert(allEmbeds, {
+                    title = (#fieldChunks > 1) and ("Found Brainrots — %s (%d/%d)"):format(rarity, idx, #fieldChunks) or ("Found Brainrots — %s"):format(rarity),
+                    url = "https://www.roblox.com/games/start?placeId=109983668079237&gameInstanceId="..game.JobId,
+                    description = "",
+                    color = RARITY_COLOR[rarity] or RARITY_COLOR["Unknown"],
+                    thumbnail = {url = "https://static.wikia.nocookie.net/stealabr/images/e/e3/Tung_Tung_Tung_Sahur.png/revision/latest?cb=20260125163843"},
+                    footer = {text = player.Name .. " | " .. tostring(playerCount) .. "/8👤"},
+                    fields = fchunk,
+                    timestamp = timestamp
+                })
+            end
+        end
+        
+        local embedBatches = chunkArray(allEmbeds, MAX_EMBEDS_PER_MESSAGE)
+        
+        for i, embedBatch in ipairs(embedBatches) do
+            local payload = {
+                content = (i == 1 and shouldPing) and "@everyone" or "",
+                username = "Cly Notify",
+                avatar_url = "https://assets.teenvogue.com/photos/5d4daf13b068cf00080a03f7/16:9/w_2560%2Cc_limit/00-story-diddy.jpg",
+                embeds = embedBatch,
+                allowed_mentions = (i == 1 and shouldPing) and { parse = {"everyone"} } or { parse = {} }
+            }
+            
+            local success, res = pcall(function()
+                return req({
+                    Url = targetUrl,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = HttpService:JSONEncode(payload)
+                })
+            end)
+            
+            if success and res then
+                print("[Webhook] Sent to", webhookName, "| Status:", res.StatusCode, "| Items:", #bucket)
+            else
+                warn("[Webhook] Failed:", res)
+            end
+            
+            if i < #embedBatches then task.wait(0.35) end
+        end
+    end
+    
+    buildAndSend(webhook1Entries, WEBHOOK_1, "WH1 (1m-50m)", false)
+    if #webhook1Entries > 0 then task.wait(0.5) end
+    
+    buildAndSend(webhook2Entries, WEBHOOK_2, "WH2 (50m-500m)", false)
+    if #webhook2Entries > 0 then task.wait(0.5) end
+    
+    buildAndSend(webhook3Entries, WEBHOOK_3, "WH3 (Ping+500m)", true)
+    if #webhook3Entries > 0 then task.wait(0.5) end
+    
+    buildAndSend(webhook4Entries, WEBHOOK_4, "WH4 (Main 10m+)", webhook4HasPingNames or webhook4Has300mPlus)
+end
+
+local function queueWebhookSend()
+    if webhookTimer then
+        webhookTimer:Cancel()
+    end
+    
+    webhookTimer = task.delay(SEND_DELAY, function()
+        webhookTimer = nil
+        if #globalFound == 0 then return end
+        
+        print("[Webhook] Sending batch of", #globalFound, "items")
+        sendWebhookGrouped(globalFound)
+        
+        table.clear(globalFound)
+        globalShouldPing = false
+    end)
+end
+
+--// PLOT HOOKING & INITIALIZATION
 local function hookPlot(plot)
     if plotConns[plot] then
         plotConns[plot]:Disconnect()
         plotConns[plot] = nil
     end
-
+    
     scanPlot(plot)
-
+    
     plotConns[plot] = plot.DescendantAdded:Connect(function()
         if scanQueued[plot] then return end
         scanQueued[plot] = true
-
+        
         task.delay(SCAN_DELAY, function()
             scanQueued[plot] = nil
             if plot and plot.Parent then
@@ -1825,6 +1935,5 @@ plotsFolder.ChildRemoved:Connect(function(plot)
     end
 end)
 
--- Webhook-only mode: No Gist management needed
-
-print("[Scanner] Initialized successfully!")
+print("[Scanner] ✅ Initialized!")
+print("[HOP] 📋 Rules: 10min default | 5min (10m+) | 3min (100m+/full) | ASAP (500m+/ping)")
