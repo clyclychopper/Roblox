@@ -399,35 +399,36 @@ local function buildServerPanel(serverId, brainrots, placeId, parent, order)
     })
 
     -- Player count
-    local plrPill = frm(header, {sz=UDim2.new(0,44,0,18), pos=UDim2.new(1,-178,0,5), bg=T.Bg})
+    local plrPill = frm(header, {sz=UDim2.new(0,44,0,18), pos=UDim2.new(1,-218,0,5), bg=T.Bg})
     corner(plrPill, 3)
     stroke(plrPill, T.Border, 1, 0)
     lbl(plrPill, {text="👥"..playerCount, size=10, color=T.TextDim, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
 
     -- Found count
-    local foundPill = frm(header, {sz=UDim2.new(0,40,0,18), pos=UDim2.new(1,-128,0,5), bg=T.Bg})
+    local foundPill = frm(header, {sz=UDim2.new(0,40,0,18), pos=UDim2.new(1,-168,0,5), bg=T.Bg})
     corner(foundPill, 3)
     stroke(foundPill, T.GreenDim, 1, 0)
     lbl(foundPill, {text="+"..#brainrots, size=10, color=T.Green, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
 
-    -- Chevron (toggle)
+    -- Join / Current badge — pinned to absolute right edge
+    -- badge width=62, right margin=6 → Position X = UDim2(1,-68,...)
+    -- chevron sits just left of badge: X = UDim2(1,-86,...)
     local isOpen = true
     local chevron = lbl(header, {
         text="▾", size=13, color=T.TextDim, font=Enum.Font.Code,
-        sz=UDim2.new(0,18,1,0), pos=UDim2.new(1,-80,0,0),
+        sz=UDim2.new(0,16,1,0), pos=UDim2.new(1,-86,0,0),
         align=Enum.TextXAlignment.Center
     })
 
-    -- Join / Current badge — far right
     if isCurrentServer then
-        local here = frm(header, {sz=UDim2.new(0,58,0,18), pos=UDim2.new(1,-62,0,5), bg=T.Bg})
+        local here = frm(header, {sz=UDim2.new(0,62,0,18), pos=UDim2.new(1,-68,0,5), bg=T.Bg})
         corner(here, 3)
         stroke(here, T.Cyan, 1, 0.3)
-        lbl(here, {text="● HERE", size=10, color=T.Cyan, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
+        lbl(here, {text="Current", size=10, color=T.Cyan, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
     else
         local joinBtn = Instance.new("TextButton")
-        joinBtn.Size = UDim2.new(0,56,0,18)
-        joinBtn.Position = UDim2.new(1,-62,0,5)
+        joinBtn.Size = UDim2.new(0,62,0,18)
+        joinBtn.Position = UDim2.new(1,-68,0,5)
         joinBtn.BackgroundColor3 = Color3.fromRGB(22,22,22)
         joinBtn.Text = "JOIN →"
         joinBtn.TextColor3 = T.TextMid
@@ -617,8 +618,8 @@ local function updateGUI(ui, data)
     local total, serverCount = #(data.brainrots or {}), 0
     for _ in pairs(groups) do serverCount = serverCount + 1 end
 
-    ui.totalLbl.Text  = tostring(total)
-    ui.serverLbl.Text = tostring(serverCount).." srv"
+    ui.totalLbl.Text  = tostring(total).." Brainrots"
+    ui.serverLbl.Text = tostring(serverCount).." Servers"
 
     local sorted = {}
     for sid, brs in pairs(groups) do
