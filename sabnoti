@@ -1905,13 +1905,17 @@ function serverHop(reason)
             local response = game:HttpGet(url)
             local data = HttpService:JSONDecode(response)
             
-            for _, server in ipairs(data.data) do
-                if server.id ~= game.JobId and server.playing < server.maxPlayers then
-                    table.insert(servers, server.id)
+            if data and data.data then
+                for _, server in ipairs(data.data) do
+                    if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                        table.insert(servers, server.id)
+                    end
                 end
+                cursor = data.nextPageCursor or ""
+            else
+                warn("[HOP] Invalid server list response, retrying...")
+                cursor = ""
             end
-            
-            cursor = data.nextPageCursor or ""
         until cursor == ""
         
         if #servers > 0 then
