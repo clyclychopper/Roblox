@@ -247,18 +247,20 @@ local function buildGUI()
     statusLbl.TextXAlignment = Enum.TextXAlignment.Left
     statusLbl.Parent = titleBar
 
-    -- Stat chips (inline in title bar)
-    local function tinyChip(icon, key, xOff)
-        local chip = frm(titleBar, {sz=UDim2.new(0,78,0,22), pos=UDim2.new(1,xOff,0,6), bg=T.Card})
+    -- Stat chips (inline in title bar) — with a neat divider gap between them
+    local function tinyChip(icon, key, xOff, accentCol)
+        local chip = frm(titleBar, {sz=UDim2.new(0,90,0,22), pos=UDim2.new(1,xOff,0,6), bg=T.Card})
         corner(chip, 4)
         stroke(chip, T.Border, 1, 0)
+        local chipAccent = frm(chip, {sz=UDim2.new(0,2,0,12), pos=UDim2.new(0,0,0,5), bg=accentCol or T.AccentSub})
+        corner(chipAccent, 1)
         lbl(chip, {text=icon, size=10, color=T.TextDim, font=Enum.Font.Code,
-            sz=UDim2.new(0,18,1,0), pos=UDim2.new(0,4,0,0), align=Enum.TextXAlignment.Center})
+            sz=UDim2.new(0,20,1,0), pos=UDim2.new(0,6,0,0), align=Enum.TextXAlignment.Center})
         local val = Instance.new("TextLabel")
         val.Name = key
         val.BackgroundTransparency = 1
-        val.Size = UDim2.new(1,-22,1,0)
-        val.Position = UDim2.new(0,20,0,0)
+        val.Size = UDim2.new(1,-28,1,0)
+        val.Position = UDim2.new(0,28,0,0)
         val.Font = Enum.Font.Code
         val.TextSize = 11
         val.TextColor3 = T.Text
@@ -268,8 +270,10 @@ local function buildGUI()
         return val
     end
 
-    local totalLbl   = tinyChip("📦", "TotalLbl",  -254)
-    local serverLbl  = tinyChip("🖥", "ServerLbl", -170)
+    local totalLbl  = tinyChip("📦", "TotalLbl",  -284, T.Green)
+    -- slim vertical divider between the two chips
+    frm(titleBar, {sz=UDim2.new(0,1,0,16), pos=UDim2.new(1,-188,0,9), bg=T.BorderBright})
+    local serverLbl = tinyChip("🖥", "ServerLbl", -186, T.Blue)
 
     -- Window buttons (minimal, no background box)
     local function winBtn(xOff, sym, hoverCol)
@@ -291,6 +295,30 @@ local function buildGUI()
 
     local closeBtn    = winBtn(-28, "✕", Color3.fromRGB(248,113,113))
     local minimizeBtn = winBtn(-52, "–", T.TextMid)
+
+    -- Resync button (small ↺, sits beside minimize)
+    local resyncBtn = Instance.new("TextButton")
+    resyncBtn.Name = "ResyncBtn"
+    resyncBtn.Size = UDim2.new(0,22,0,22)
+    resyncBtn.Position = UDim2.new(1,-80,0,6)
+    resyncBtn.BackgroundColor3 = T.Card
+    resyncBtn.Text = "↺"
+    resyncBtn.TextColor3 = T.TextDim
+    resyncBtn.TextSize = 14
+    resyncBtn.Font = Enum.Font.Code
+    resyncBtn.BorderSizePixel = 0
+    resyncBtn.AutoButtonColor = false
+    resyncBtn.Parent = titleBar
+    corner(resyncBtn, 4)
+    stroke(resyncBtn, T.Border, 1, 0)
+    resyncBtn.MouseEnter:Connect(function()
+        resyncBtn.TextColor3 = T.Green
+        resyncBtn.BackgroundColor3 = T.CardHover
+    end)
+    resyncBtn.MouseLeave:Connect(function()
+        resyncBtn.TextColor3 = T.TextDim
+        resyncBtn.BackgroundColor3 = T.Card
+    end)
 
     -- ── Scroll Area ────────────────────────────
     local scroll = Instance.new("ScrollingFrame")
@@ -322,7 +350,7 @@ local function buildGUI()
     return {
         gui=sg, win=win, titleBar=titleBar, scroll=scroll,
         statusLbl=statusLbl, totalLbl=totalLbl, serverLbl=serverLbl,
-        closeBtn=closeBtn, minimizeBtn=minimizeBtn,
+        closeBtn=closeBtn, minimizeBtn=minimizeBtn, resyncBtn=resyncBtn,
     }
 end
 
@@ -390,25 +418,31 @@ local function buildServerPanel(serverId, brainrots, placeId, parent, order)
         bg=isHighlighted and T.Gold or (isCurrentServer and T.Cyan or T.AccentSub)})
     corner(strip, 1)
 
-    -- Server ID
+    -- Server ID (takes most of the left space now)
     lbl(header, {
         text=(isHighlighted and "★ " or "")..shortId,
         size=11, color=isHighlighted and T.Gold or T.TextMid, font=Enum.Font.Code,
-        sz=UDim2.new(1,-220,1,0), pos=UDim2.new(0,18,0,0),
+        sz=UDim2.new(1,-100,1,0), pos=UDim2.new(0,18,0,0),
         align=Enum.TextXAlignment.Left, trunc=true
     })
 
-    -- Player count
-    local plrPill = frm(header, {sz=UDim2.new(0,44,0,18), pos=UDim2.new(1,-218,0,5), bg=T.Bg})
+    -- Right-side cluster: [👥N] [+N] [▾] [JOIN →]
+    -- Layout from right: join@-68, chevron@-86, found@-130, players@-178
+
+    -- Player count pill
+    local plrPill = frm(header, {sz=UDim2.new(0,40,0,18), pos=UDim2.new(1,-226,0,5), bg=T.Bg})
     corner(plrPill, 3)
     stroke(plrPill, T.Border, 1, 0)
     lbl(plrPill, {text="👥"..playerCount, size=10, color=T.TextDim, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
 
-    -- Found count
-    local foundPill = frm(header, {sz=UDim2.new(0,40,0,18), pos=UDim2.new(1,-168,0,5), bg=T.Bg})
+    -- Found count pill
+    local foundPill = frm(header, {sz=UDim2.new(0,36,0,18), pos=UDim2.new(1,-180,0,5), bg=T.Bg})
     corner(foundPill, 3)
     stroke(foundPill, T.GreenDim, 1, 0)
     lbl(foundPill, {text="+"..#brainrots, size=10, color=T.Green, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
+
+    -- Thin separator before join area
+    frm(header, {sz=UDim2.new(0,1,0,14), pos=UDim2.new(1,-138,0,7), bg=T.BorderBright})
 
     -- Join / Current badge — pinned to absolute right edge
     -- badge width=62, right margin=6 → Position X = UDim2(1,-68,...)
@@ -424,7 +458,7 @@ local function buildServerPanel(serverId, brainrots, placeId, parent, order)
         local here = frm(header, {sz=UDim2.new(0,62,0,18), pos=UDim2.new(1,-68,0,5), bg=T.Bg})
         corner(here, 3)
         stroke(here, T.Cyan, 1, 0.3)
-        lbl(here, {text="Current", size=10, color=T.Cyan, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
+        lbl(here, {text="● HERE", size=10, color=T.Cyan, font=Enum.Font.Code, align=Enum.TextXAlignment.Center})
     else
         local joinBtn = Instance.new("TextButton")
         joinBtn.Size = UDim2.new(0,62,0,18)
@@ -618,8 +652,8 @@ local function updateGUI(ui, data)
     local total, serverCount = #(data.brainrots or {}), 0
     for _ in pairs(groups) do serverCount = serverCount + 1 end
 
-    ui.totalLbl.Text  = tostring(total).." Brainrots"
-    ui.serverLbl.Text = tostring(serverCount).." Servers"
+    ui.totalLbl.Text  = tostring(total)
+    ui.serverLbl.Text = tostring(serverCount).." srv"
 
     local sorted = {}
     for sid, brs in pairs(groups) do
@@ -654,23 +688,46 @@ local function main()
         ui.minimizeBtn.Text = minimized and "□" or "—"
     end)
 
-    local data = fetchGistData()
-    if data then
-        lastKnownTimestamp = data.timestamp
-        updateGUI(ui, data)
+    -- Shared sync function used by both auto-loop and resync button
+    local isSyncing = false
+    local lastAutoSync = os.time()
+    local AUTO_RESYNC_INTERVAL = 30 -- force UI refresh every 30s even if no new data
+
+    local function doSync(force)
+        if isSyncing then return end
+        isSyncing = true
+        ui.resyncBtn.Text = "↻"
+        ui.resyncBtn.TextColor3 = T.Yellow
+        local newData = fetchGistData()
+        if ui.gui.Parent and newData then
+            -- Update UI if data changed OR forced (resets the "X ago" timer display)
+            if force or newData.timestamp ~= lastKnownTimestamp then
+                lastKnownTimestamp = newData.timestamp
+                updateGUI(ui, newData)
+                print("[Viewer] 🔄 Synced" .. (force and " (manual)" or " (new data)"))
+            end
+        end
+        ui.resyncBtn.Text = "↺"
+        ui.resyncBtn.TextColor3 = T.TextDim
+        isSyncing = false
+        lastAutoSync = os.time()
     end
 
+    -- Initial load
+    doSync(true)
+
+    -- Manual resync button
+    ui.resyncBtn.MouseButton1Click:Connect(function()
+        task.spawn(function() doSync(true) end)
+    end)
+
+    -- Auto loop: check every REFRESH_INTERVAL, force-resync every 30s
     task.spawn(function()
         while ui.gui.Parent do
             task.wait(REFRESH_INTERVAL)
-            local newData = fetchGistData()
-            if ui.gui.Parent and newData then
-                if newData.timestamp ~= lastKnownTimestamp then
-                    lastKnownTimestamp = newData.timestamp
-                    updateGUI(ui, newData)
-                    print("[Viewer] 🔄 Synced new data")
-                end
-            end
+            if not ui.gui.Parent then break end
+            local shouldForce = (os.time() - lastAutoSync) >= AUTO_RESYNC_INTERVAL
+            task.spawn(function() doSync(shouldForce) end)
         end
     end)
 
