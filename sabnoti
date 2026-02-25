@@ -1698,11 +1698,10 @@ local function queueWebhookSend()
         if #globalFound == 0 then return end
 
         
-        print("[Webhook] Sending batch of", #globalFound, "items, ping:", globalShouldPing)
+        print("[Webhook] Sending batch of", #globalFound, "items")
         sendWebhookGrouped(globalFound)
 
         table.clear(globalFound)
-        globalShouldPing = false
     end)
     
 end
