@@ -642,33 +642,6 @@ local function updateGUI(ui, data)
         return
     end
 
-    ui.statusLbl.Text = "· just now"
-    ui.statusLbl.TextColor3 = T.Green
-
-    -- Fade the status to "X ago" over time
-    local syncedAt = os.time()
-    task.spawn(function()
-        while ui.gui.Parent do
-            task.wait(5)
-            local d = os.time() - syncedAt
-            if d < 60 then
-                ui.statusLbl.Text = "· "..d.."s ago"
-            elseif d < 3600 then
-                ui.statusLbl.Text = "· "..math.floor(d/60).."m ago"
-            else
-                ui.statusLbl.Text = "· "..math.floor(d/3600).."h ago"
-            end
-            -- Color goes dim as it ages
-            if d >= 60 then
-                ui.statusLbl.TextColor3 = T.Orange
-            elseif d >= 25 then
-                ui.statusLbl.TextColor3 = T.TextDim
-            else
-                ui.statusLbl.TextColor3 = T.Green
-            end
-        end
-    end)
-
     for _, ch in ipairs(ui.scroll:GetChildren()) do
         if ch:IsA("Frame") then ch:Destroy() end
     end
@@ -719,15 +692,37 @@ local function main()
         ui.minimizeBtn.Text = minimized and "□" or "—"
     end)
 
-    -- Shared sync function used by both auto-loop and resync button
+    -- Single shared syncedAt — updated whenever we successfully sync
+    local syncedAt = os.time()
     local isSyncing = false
     local lastAutoSync = os.time()
-    local AUTO_RESYNC_INTERVAL = 30 -- force UI refresh every 30s even if no new data
+    local AUTO_RESYNC_INTERVAL = 30
+
+    -- One persistent ticker that reads syncedAt — never respawned
+    task.spawn(function()
+        while ui.gui.Parent do
+            task.wait(1)
+            if not ui.gui.Parent then break end
+            local d = os.time() - syncedAt
+            if d < 5 then
+                ui.statusLbl.Text = "· just now"
+                ui.statusLbl.TextColor3 = T.Green
+            elseif d < 60 then
+                ui.statusLbl.Text = "· "..d.."s ago"
+                ui.statusLbl.TextColor3 = d < 25 and T.Green or T.TextDim
+            elseif d < 3600 then
+                ui.statusLbl.Text = "· "..math.floor(d/60).."m ago"
+                ui.statusLbl.TextColor3 = T.Orange
+            else
+                ui.statusLbl.Text = "· "..math.floor(d/3600).."h ago"
+                ui.statusLbl.TextColor3 = T.Red
+            end
+        end
+    end)
 
     local function doSync(force)
         if isSyncing then return end
         isSyncing = true
-        -- Spinning state
         ui.resyncBtn.Text = "↻"
         ui.resyncBtn.TextColor3 = T.Yellow
         ui.resyncBtn.BackgroundColor3 = Color3.fromRGB(40,35,10)
@@ -737,14 +732,11 @@ local function main()
             if force or newData.timestamp ~= lastKnownTimestamp then
                 lastKnownTimestamp = newData.timestamp
                 updateGUI(ui, newData)
-            else
-                -- No new data but still reset the displayed timer
-                ui.statusLbl.Text = "· just now"
-                ui.statusLbl.TextColor3 = T.Green
             end
+            -- Always reset the timer on any successful fetch
+            syncedAt = os.time()
         end
 
-        -- Restore button to its normal green state
         ui.resyncBtn.Text = "↺"
         ui.resyncBtn.TextColor3 = Color3.fromRGB(74,222,128)
         ui.resyncBtn.BackgroundColor3 = Color3.fromRGB(18,30,20)
