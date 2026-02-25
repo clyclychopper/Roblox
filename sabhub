@@ -234,17 +234,18 @@ local function buildGUI()
         align=Enum.TextXAlignment.Left
     })
 
-    -- Status (right of title)
+    -- Status label — sits left of the chips cluster, right of title
+    -- chips start at -280, so status fits in the gap between title and chips
     local statusLbl = Instance.new("TextLabel")
     statusLbl.Name = "StatusLbl"
     statusLbl.BackgroundTransparency = 1
-    statusLbl.Size = UDim2.new(0,100,1,0)
-    statusLbl.Position = UDim2.new(0,130,0,0)
+    statusLbl.Size = UDim2.new(0,90,1,0)
+    statusLbl.Position = UDim2.new(1,-370,0,0)
     statusLbl.Font = Enum.Font.Code
     statusLbl.TextSize = 10
     statusLbl.TextColor3 = T.TextDim
-    statusLbl.Text = "syncing..."
-    statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+    statusLbl.Text = "· syncing..."
+    statusLbl.TextXAlignment = Enum.TextXAlignment.Right
     statusLbl.Parent = titleBar
 
     -- Title bar right side layout (from right edge, no overlaps):
@@ -728,13 +729,14 @@ local function main()
         ui.resyncBtn.BackgroundColor3 = Color3.fromRGB(40,35,10)
 
         local newData = fetchGistData()
+        -- Always reset the timer on every sync attempt (success or not)
+        syncedAt = os.time()
+
         if ui.gui.Parent and newData then
             if force or newData.timestamp ~= lastKnownTimestamp then
                 lastKnownTimestamp = newData.timestamp
                 updateGUI(ui, newData)
             end
-            -- Always reset the timer on any successful fetch
-            syncedAt = os.time()
         end
 
         ui.resyncBtn.Text = "↺"
@@ -747,8 +749,9 @@ local function main()
     -- Initial load
     doSync(true)
 
-    -- Manual resync button
+    -- Manual resync: cancel any ongoing sync so manual always wins
     ui.resyncBtn.MouseButton1Click:Connect(function()
+        isSyncing = false  -- force unlock so manual click is never dropped
         task.spawn(function() doSync(true) end)
     end)
 
