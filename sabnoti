@@ -10,13 +10,14 @@ local WEBHOOK_3 = getgenv().Webhook3 or error("❌ Webhook3 not set!")  -- ping 
 local WEBHOOK_4 = getgenv().Webhook4 or error("❌ Webhook4 not set!")  -- everything 10m+
 
 -- Debug: Print credentials status
-print("[Config] Webhook:", WEBHOOK_4 and "✅ Set" or "❌ Missing")
+print("[Config] Webhook:", WEBHOOK_NORMAL and "✅ Set" or "❌ Missing")
 local MIN_INCOME = 5000000  -- 5m minimum for webhook 1
 local WEBHOOK_4_MIN = 10000000  -- 10m minimum for webhook 4
 local MID_THRESHOLD = 50000000  -- 50m
 local PING_THRESHOLD = 100000000  -- 100m threshold for ping names
 local HIGH_THRESHOLD = 500000000  -- 500m
-
+local SEND_DELAY = 3
+local SCAN_DELAY = 1.5
 
 local PING_NAMES = {
     ["Rosetti Tualetti"] = true,
@@ -64,7 +65,7 @@ local PING_NAMES = {
 
 }
 
-
+local globalShouldPing = false
 
 local brainrots = {
 -- God
@@ -1321,58 +1322,6 @@ local traitAliases = {
     ["SleepySleepy"] = "Sleepy",
 }
 
--- Add this near the top with other data tables (after line 1100 or so)
-local thumbnailByName = {
-    -- Ping Names Thumbnails (replace URLs with actual image links)
-    ["Rosetti Tualetti"] = "https://static.wikia.nocookie.net/stealabr/images/f/f8/Rossetti_Tualetti.png/revision/latest/scale-to-width-down/1000?cb=20260208175516",
-    ["Rosey and Teddy"] = "https://static.wikia.nocookie.net/stealabr/images/9/9b/Rosey_and_Teddy.png/revision/latest/scale-to-width-down/1000?cb=20260208175726",
-    ["Los Amigos"] = "https://static.wikia.nocookie.net/stealabr/images/0/01/Los_Amigos.png/revision/latest/scale-to-width-down/1000?cb=20260222122638",
-    ["Smurf Cat"] = "https://static.wikia.nocookie.net/stealabr/images/0/01/Los_Amigos.png/revision/latest/scale-to-width-down/1000?cb=20260222122638",
-    ["John Pork"] = "https://static.wikia.nocookie.net/stealabr/images/3/3a/JohnPork.png.png/revision/latest/scale-to-width-down/1000?cb=20260124181927",
-    ["Dragon Cannelloni"] = "https://static.wikia.nocookie.net/stealabr/images/3/31/Nah_uh.png/revision/latest?cb=20250919124457",
-    ["Meowl"] = "https://static.wikia.nocookie.net/stealabr/images/b/b8/Clear_background_clear_meowl_image.png/revision/latest?cb=20251022133154",
-    ["Strawberry Elephant"] = "https://static.wikia.nocookie.net/stealabr/images/5/58/Strawberryelephant.png/revision/latest?cb=20250830235735",
-    ["Fragrama and Chocrama"] = "https://static.wikia.nocookie.net/stealabr/images/5/56/Fragrama.png/revision/latest?cb=20251109011733",
-    ["Ketupat Kepat"] = "https://static.wikia.nocookie.net/stealabr/images/a/ac/KetupatKepat.png/revision/latest?cb=20251220220246",
-    ["Tang Tang Kelentang"] = "https://static.wikia.nocookie.net/stealabr/images/c/ce/TangTangVfx.png/revision/latest?cb=20251014025849",
-    ["La Secret Combinasion"] = "https://static.wikia.nocookie.net/stealabr/images/f/f2/Lasecretcombinasion.png/revision/latest?cb=20251006044448",
-    ["Los Bros"] = "https://static.wikia.nocookie.net/stealabr/images/5/53/BROOOOOOOO.png/revision/latest?cb=20250909152032",
-    ["Los Hotspotsitos"] = "https://static.wikia.nocookie.net/stealabr/images/6/69/Loshotspotsitos.png/revision/latest?cb=20251226204212",
-    ["Spaghetti Tualetti"] = "https://static.wikia.nocookie.net/stealabr/images/b/b8/Spaghettitualetti.png/revision/latest?cb=20251122142032",
-    ["Tralaledon"] = "https://static.wikia.nocookie.net/stealabr/images/7/79/Brr_Brr_Patapem.png/revision/latest?cb=20250909171639",
-    ["Ketchuru and Masturu"] = "https://static.wikia.nocookie.net/stealabr/images/1/14/Ketchuru.png/revision/latest?cb=20251021163857",
-    ["Garama and Madundung"] = "https://static.wikia.nocookie.net/stealabr/images/e/ee/Garamadundung.png/revision/latest?cb=20250816022557",
-    ["Nuclearo Dinosauro"] = "https://static.wikia.nocookie.net/stealabr/images/c/c6/Nuclearo_Dinosauro.png/revision/latest?cb=20250902180735",
-    ["Los Tacoritas"] = "https://static.wikia.nocookie.net/stealabr/images/4/40/My_kids_will_also_rob_you.png/revision/latest?cb=20250921171602",
-    ["Tictac Sahur"] = "https://static.wikia.nocookie.net/stealabr/images/6/6f/Time_moving_slow.png/revision/latest?cb=20251103171934",
-    ["La Supreme Combinasion"] = "https://static.wikia.nocookie.net/stealabr/images/5/52/SupremeCombinasion.png/revision/latest?cb=20250825130920",
-    ["Los Combinasionas"] = "https://static.wikia.nocookie.net/stealabr/images/3/36/Stop_taking_my_chips_im_just_a_baybeh.png/revision/latest?cb=20250909223756",
-    ["La Casa Boo"] = "https://static.wikia.nocookie.net/stealabr/images/d/de/Casa_Booo.png/revision/latest?cb=20251220094233",
-    ["Los Spooky Combinasionas"] = "https://static.wikia.nocookie.net/stealabr/images/8/8a/Lospookycombi.png/revision/latest?cb=20251030015823",
-    ["Reinito Sleighito"] = "https://static.wikia.nocookie.net/stealabr/images/2/27/Reinito.png/revision/latest?cb=20251219225020",
-    ["Sammyni Fattini"] = "https://static.wikia.nocookie.net/stealabr/images/0/01/Sammyni_Fattini.png/revision/latest?cb=20260224002154",
-    ["Ketupat Bros"] = "https://static.wikia.nocookie.net/stealabr/images/4/4d/Ketupat_Bros.png/revision/latest/scale-to-width-down/1000?cb=20260207220106",
-    ["Burguro And Fryuro"] = "https://static.wikia.nocookie.net/stealabr/images/6/65/Burguro-And-Fryuro.png/revision/latest?cb=20251007133840",
-    ["Lavadorito Spinito"] = "https://static.wikia.nocookie.net/stealabr/images/f/ff/Lavadorito_Spinito.png/revision/latest?cb=20251123122422",
-    ["Hydra Dragon Cannelloni"] = "https://example.com/hydra-dragon-cannelloni.png",
-    ["Dragon Gingerini"] = "https://static.wikia.nocookie.net/stealabr/images/e/ee/Hydra_Dragon_Cannelloni.png/revision/latest?cb=20260207220000",
-    ["Spooky and Pumpky"] = "https://static.wikia.nocookie.net/stealabr/images/d/d6/Spookypumpky.png/revision/latest?cb=20251012023638",
-    ["Cerberus"] = "https://static.wikia.nocookie.net/stealabr/images/4/45/Cerberus.png/revision/latest?cb=20260217181804",
-    ["Popcuru and Fizzuru"] = "https://static.wikia.nocookie.net/stealabr/images/a/a9/Popuru_and_Fizzuru.png/revision/latest?cb=20260213204324",
-    ["Swaggy Bros"] = "https://static.wikia.nocookie.net/stealabr/images/8/85/Swaggy_Bros.png/revision/latest?cb=20251223161444",
-    ["Orcaledon"] = "https://static.wikia.nocookie.net/stealabr/images/a/a6/Orcaledon.png/revision/latest?cb=20251119170121",
-    ["Eviledon"] = "https://static.wikia.nocookie.net/stealabr/images/7/78/Eviledonn.png/revision/latest?cb=20251012023919",
-    ["Cooki and Milki"] = "https://static.wikia.nocookie.net/stealabr/images/9/9b/Cooki_and_milki.png/revision/latest?cb=20251106165517",
-    ["Capitano Moby"] = "https://static.wikia.nocookie.net/stealabr/images/e/ef/Moby.png/revision/latest?cb=20251101185416",
-    ["Headless Horseman"] = "https://static.wikia.nocookie.net/stealabr/images/f/ff/Headlesshorseman.png/revision/latest?cb=20251030020338",
-    ["Noo my Heart"] = "https://static.wikia.nocookie.net/stealabr/images/7/75/NooMyLoveheart.png/revision/latest/scale-to-width-down/1000?cb=20260208175244",
-    
-    -- Default thumbnail fallback
-    ["_default"] = "https://static.wikia.nocookie.net/stealabr/images/e/e3/Tung_Tung_Tung_Sahur.png/revision/latest?cb=20260125163843"
-}
-
-
-
 --// WEBHOOK ONLY MODE (Gist handled by Master Bot)
 local HttpService = game:GetService("HttpService")
 
@@ -1491,7 +1440,7 @@ local function computeIncome(baseIncome, mutation, traitString)
     mutation = normalizeMutation(mutation)
     local mMult = mutationMultipliers[mutation] or 1
     local rawTraits = parseTraits(traitString)
-    local mults = {}
+    local traitMults = {}
     local displayTraits = {}
     local seen = {}
 
@@ -1499,7 +1448,7 @@ local function computeIncome(baseIncome, mutation, traitString)
         local tName = traitAliases[rawTrait] or rawTrait
         local tMult = traits[tName]
         if tMult then
-            table.insert(mults, tMult)
+            table.insert(traitMults, tMult)
         else
             warn("[Brainrot] Unknown trait:", rawTrait, "mapped:", tName)
         end
@@ -1509,24 +1458,35 @@ local function computeIncome(baseIncome, mutation, traitString)
         end
     end
 
-    if mMult > 1 then
-        table.insert(mults, mMult)
+    if #traitMults == 0 then
+        return math.floor(base * mMult), displayTraits
     end
 
-    if #mults == 0 then
-        return base, displayTraits
-    end
-
-    table.sort(mults, function(a,b) return a > b end)
-    local sum = mults[1]
-    for i = 2, #mults do
-        local reduced = mults[i] - 1
-        if reduced > 0 then
-            sum += reduced
+    -- If NO mutation (mMult == 1), traits add directly
+    -- If mutation exists, use additive stacking with -1 reduction
+    local hasMutation = mMult > 1
+    
+    if hasMutation then
+        -- Combine mutation and traits, then apply additive stacking
+        table.insert(traitMults, mMult)
+        table.sort(traitMults, function(a,b) return a > b end)
+        
+        local sum = traitMults[1]
+        for i = 2, #traitMults do
+            local reduced = traitMults[i] - 1
+            if reduced > 0 then
+                sum += reduced
+            end
         end
+        return math.floor(base * sum), displayTraits
+    else
+        -- No mutation: traits add directly without -1 reduction
+        local sum = 0
+        for _, mult in ipairs(traitMults) do
+            sum += mult
+        end
+        return math.floor(base * sum), displayTraits
     end
-
-    return math.floor(base * sum), displayTraits
 end
 
 --// LOOKUP SET
@@ -1550,8 +1510,6 @@ end
 rarityByName = normalizeMap(rarityByName)
 costByName = normalizeMap(costByName)
 incomeByName = normalizeMap(incomeByName)
-
-thumbnailByName = normalizeMap(thumbnailByName)
 
 local newPing = {}
 for name,_ in pairs(PING_NAMES) do
@@ -1628,102 +1586,96 @@ local function sendWebhookGrouped(entries)
     local timestamp = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.min, t.sec)
     local playerCount = #Players:GetPlayers()
 
-local function buildAndSend(bucket, targetUrl, webhookName, shouldPing)
-    if #bucket == 0 then return end
+    local function buildAndSend(bucket, targetUrl, webhookName, shouldPing)
+        if #bucket == 0 then return end
 
-    -- Group by rarity
-    local groups = {}
-    for _, e in ipairs(bucket) do
-        local r = e.rarity or "Unknown"
-        groups[r] = groups[r] or {}
-        table.insert(groups[r], e)
-    end
+        -- Group by rarity
+        local groups = {}
+        for _, e in ipairs(bucket) do
+            local r = e.rarity or "Unknown"
+            groups[r] = groups[r] or {}
+            table.insert(groups[r], e)
+        end
 
-    local rarities = {}
-    for r,_ in pairs(groups) do table.insert(rarities, r) end
-    table.sort(rarities, function(a,b)
-        return (RARITY_ORDER[a] or 0) > (RARITY_ORDER[b] or 0)
-    end)
-
-    local allEmbeds = {}
-
-    for _, rarity in ipairs(rarities) do
-        local group = groups[rarity]
-        table.sort(group, function(a,b)
-            return (a.income or 0) > (b.income or 0)
+        local rarities = {}
+        for r,_ in pairs(groups) do table.insert(rarities, r) end
+        table.sort(rarities, function(a,b)
+            return (RARITY_ORDER[a] or 0) > (RARITY_ORDER[b] or 0)
         end)
 
-        -- Get thumbnail from highest income brainrot in this group
-        local thumbnailUrl = thumbnailByName["_default"]
-        if #group > 0 and group[1].cleanName then
-            thumbnailUrl = thumbnailByName[group[1].cleanName] or thumbnailByName["_default"]
+        local allEmbeds = {}
+
+        for _, rarity in ipairs(rarities) do
+            local group = groups[rarity]
+            table.sort(group, function(a,b)
+                return (a.income or 0) > (b.income or 0)
+            end)
+
+            local brainrotFields = {}
+            for _, e in ipairs(group) do
+                table.insert(brainrotFields, {
+                    name = clampStr(("💵 %s/s"):format(short(e.income)), 256),
+                    value = clampStr(e.line, 1024),
+                    inline = false
+                })
+            end
+
+            local PER_EMBED_BRAINROT_FIELDS = MAX_FIELDS_PER_EMBED - 2
+            local fieldChunks = chunkArray(brainrotFields, PER_EMBED_BRAINROT_FIELDS)
+
+            for idx, fchunk in ipairs(fieldChunks) do
+                table.insert(fchunk, {
+                    name = "Server ID",
+                    value = "```" .. game.JobId .. "```",
+                    inline = false
+                })
+
+                table.insert(allEmbeds, {
+                    title = (#fieldChunks > 1)
+                        and ("Found Brainrots — %s (%d/%d)"):format(rarity, idx, #fieldChunks)
+                        or  ("Found Brainrots — %s"):format(rarity),
+                    url = "https://www.roblox.com/games/start?placeId=109983668079237&gameInstanceId="..game.JobId,
+                    description = "",
+                    color = RARITY_COLOR[rarity] or RARITY_COLOR["Unknown"],
+                    thumbnail = {url = "https://static.wikia.nocookie.net/stealabr/images/e/e3/Tung_Tung_Tung_Sahur.png/revision/latest?cb=20260125163843"},
+                    footer = {text = player.Name .. " | " .. tostring(playerCount) .. "/8👤"},
+                    fields = fchunk,
+                    timestamp = timestamp
+                })
+            end
         end
 
-        local brainrotFields = {}
-        for _, e in ipairs(group) do
-            table.insert(brainrotFields, {
-                name = clampStr(("💵 %s/s"):format(short(e.income)), 256),
-                value = clampStr(e.line, 1024),
-                inline = false
-            })
-        end
+        local embedBatches = chunkArray(allEmbeds, MAX_EMBEDS_PER_MESSAGE)
 
-        local PER_EMBED_BRAINROT_FIELDS = MAX_FIELDS_PER_EMBED - 2
-        local fieldChunks = chunkArray(brainrotFields, PER_EMBED_BRAINROT_FIELDS)
+        for i, embedBatch in ipairs(embedBatches) do
+            local payload = {
+                content = (i == 1 and shouldPing) and "@everyone" or "",
+                username = "Cly Notify [" .. webhookName .. "]",
+                avatar_url = "https://assets.teenvogue.com/photos/5d4daf13b068cf00080a03f7/16:9/w_2560%2Cc_limit/00-story-diddy.jpg",
+                embeds = embedBatch,
+                allowed_mentions = (i == 1 and shouldPing) and { parse = {"everyone"} } or { parse = {} }
+            }
 
-        for idx, fchunk in ipairs(fieldChunks) do
-            table.insert(fchunk, {
-                name = "Server ID",
-                value = "```" .. game.JobId .. "```",
-                inline = false
-            })
+            local success, res = pcall(function()
+                return req({
+                    Url = targetUrl,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = HttpService:JSONEncode(payload)
+                })
+            end)
 
-            table.insert(allEmbeds, {
-                title = (#fieldChunks > 1)
-                    and ("Found Brainrots — %s (%d/%d)"):format(rarity, idx, #fieldChunks)
-                    or  ("Found Brainrots — %s"):format(rarity),
-                url = "https://www.roblox.com/games/start?placeId=109983668079237&gameInstanceId="..game.JobId,
-                description = "",
-                color = RARITY_COLOR[rarity] or RARITY_COLOR["Unknown"],
-                thumbnail = {url = thumbnailUrl},  -- Use dynamic thumbnail
-                footer = {text = player.Name .. " | " .. tostring(playerCount) .. "/8👤"},
-                fields = fchunk,
-                timestamp = timestamp
-            })
+            if success and res then
+                print("[Webhook] Sent to", webhookName, "| Status:", res.StatusCode, "| Items:", #bucket)
+            else
+                warn("[Webhook] Failed:", res)
+            end
+
+            if i < #embedBatches then
+                task.wait(0.35)
+            end
         end
     end
-
-    local embedBatches = chunkArray(allEmbeds, MAX_EMBEDS_PER_MESSAGE)
-
-    for i, embedBatch in ipairs(embedBatches) do
-        local payload = {
-            content = (i == 1 and shouldPing) and "@everyone" or "",
-            username = "Cly Notify",  -- ✅ Changed from "Cly Notify [" .. webhookName .. "]"
-            avatar_url = "https://assets.teenvogue.com/photos/5d4daf13b068cf00080a03f7/16:9/w_2560%2Cc_limit/00-story-diddy.jpg",
-            embeds = embedBatch,
-            allowed_mentions = (i == 1 and shouldPing) and { parse = {"everyone"} } or { parse = {} }
-        }
-
-        local success, res = pcall(function()
-            return req({
-                Url = targetUrl,
-                Method = "POST",
-                Headers = { ["Content-Type"] = "application/json" },
-                Body = HttpService:JSONEncode(payload)
-            })
-        end)
-
-        if success and res then
-            print("[Webhook] Sent to", webhookName, "| Status:", res.StatusCode, "| Items:", #bucket)
-        else
-            warn("[Webhook] Failed:", res)
-        end
-
-        if i < #embedBatches then
-            task.wait(0.35)
-        end
-    end
-end
 
     -- Send to all webhooks in sequence
     buildAndSend(webhook1Entries, WEBHOOK_1, "WH1 (1m-50m)", false)
@@ -1757,10 +1709,11 @@ local function queueWebhookSend()
         if #globalFound == 0 then return end
 
         
-        print("[Webhook] Sending batch of", #globalFound, "items")
+        print("[Webhook] Sending batch of", #globalFound, "items, ping:", globalShouldPing)
         sendWebhookGrouped(globalFound)
 
         table.clear(globalFound)
+        globalShouldPing = false
     end)
     
 end
@@ -1801,6 +1754,10 @@ local function scanPlot(plot)
     
                         local isPingName = PING_NAMES[cleanName] or false
                         
+                        if shouldPing then
+                            globalShouldPing = true
+                        end
+
                         -- Webhook-only mode: Master Bot handles Gist updates
 
                         local label = ("**%s** | **%s** | 🧬 **%s** | 💰 **$%s** | 🌀 **%s**")
@@ -1810,8 +1767,7 @@ local function scanPlot(plot)
                             rarity = rarity,
                             income = finalIncome,
                             line = label,
-                            isPingName = isPingName,
-                            cleanName = cleanName
+                            isPing = isPingName
                         })
                     end
                 end
