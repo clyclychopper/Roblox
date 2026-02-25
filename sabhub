@@ -1,6 +1,3 @@
---// BRAINROT VIEWER v3 — Compact Black Modern
---// Sleek, dense, all info retained. No fluff.
-
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
@@ -444,7 +441,7 @@ local function buildGUI()
     miscLayout.Padding = UDim.new(0,8)
     miscLayout.Parent = miscScroll
 
-        local miscPad = Instance.new("UIPadding")
+    local miscPad = Instance.new("UIPadding")
     miscPad.PaddingTop    = UDim.new(0,6)
     miscPad.PaddingBottom = UDim.new(0,6)
     miscPad.PaddingLeft   = UDim.new(0,6)
@@ -918,7 +915,7 @@ local function updateGUI(ui, data)
     for _ in pairs(groups) do serverCount = serverCount + 1 end
 
     ui.totalLbl.Text  = tostring(total)
-    ui.serverLbl.Text = tostring(serverCount).." servers"
+    ui.serverLbl.Text = tostring(serverCount).." srv"
 
     local sorted = {}
     for sid, brs in pairs(groups) do
@@ -1064,10 +1061,10 @@ local function main()
         end
     end)
 
-    -- Draggable
+        -- Draggable (mobile + desktop)
     local dragging, dragStart, winStart
     ui.titleBar.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = inp.Position
             winStart = ui.win.Position
@@ -1078,7 +1075,9 @@ local function main()
     end)
     local lastDrag
     ui.titleBar.InputChanged:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseMovement then lastDrag = inp end
+        if inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch then
+            lastDrag = inp
+        end
     end)
     UserInputService.InputChanged:Connect(function(inp)
         if inp == lastDrag and dragging then
