@@ -1371,8 +1371,7 @@ local thumbnailByName = {
     ["_default"] = "https://static.wikia.nocookie.net/stealabr/images/e/e3/Tung_Tung_Tung_Sahur.png/revision/latest?cb=20260125163843"
 }
 
--- Normalize the thumbnail map
-thumbnailByName = normalizeMap(thumbnailByName)
+
 
 --// WEBHOOK ONLY MODE (Gist handled by Master Bot)
 local HttpService = game:GetService("HttpService")
@@ -1551,6 +1550,8 @@ end
 rarityByName = normalizeMap(rarityByName)
 costByName = normalizeMap(costByName)
 incomeByName = normalizeMap(incomeByName)
+
+thumbnailByName = normalizeMap(thumbnailByName)
 
 local newPing = {}
 for name,_ in pairs(PING_NAMES) do
