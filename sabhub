@@ -1,3 +1,4 @@
+local player = game:GetService("Players").LocalPlayer
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
@@ -10,269 +11,6 @@ local GIST_FILENAME = "brainrot_server.json"
 local REFRESH_INTERVAL = 5
 local USE_MOCK_DATA = false
 local lastKnownTimestamp = 0
-
--- TABLES
-
--- Income table for Auto Grab
-local incomeByName = {
-    ["Swaggy Bros"] = 40000000,
-    ["Los Amigos"] = 130000000,
-    ["Sammyni Fattini"] = 70000000,
-    ["John Pork"] = 999999999999999,
-    ["Smurf Cat"] = 999999999999999,
-
-    ["La Food Combinasion"] = 90000000,
-    ["Los Sekolahs"] = 110000000,
-    --GOD
-    ["Tim Cheese"] = 20,
-    ["Fizzy Soda"] = 17200,
-    ["Cocofanto Elefanto"] = 10000,
-    ["Antonio"] = 18500,
-    ["Girafa Celestre"] = 20000,
-    ["Gattatino Nyanino"] = 35000,
-    ["Gattatino Neonino"] = 20000,
-    ["Chihuanini Taconini"] = 45000,
-    ["Matteo"] = 50000,
-    ["Tralalero Tralala"] = 50000,
-    ["Los Crocodillitos"] = 55000,
-    ["Tigroligre Frutonni"] = 60000,
-    ["Odin Din Din Dun"] = 75000,
-    ["Orcalero Orcala"] = 100000,
-    ["Money Money Man"] = 65000,
-    ["Alessio"] = 65000,
-    ["Unclito Samito"] = 65000,
-    ["Statutino Libertino"] = 75000,
-    ["Tipi Topi Taco"] = 75000,
-    ["Tralalita Tralala"] = 100000,
-    ["Tukanno Banana"] = 100000,
-    ["Extinct Ballerina"] = 125000,
-    ["Vampira Cappucina"] = 125000,
-    ["Espresso Signora"] = 70000,
-    ["Trenozosturzzo Turbo 3000"] = 150000,
-    ["Bulbito Bandito Traktorito"] = 205000,
-    ["Urubini Flamenguini"] = 150000,
-    ["Jacko Jack Jack"] = 150000,
-    ["Trippi Troppi Troppa Trippa"] = 175000,
-    ["Capi Taco"] = 155000,
-    ["Los Chihuaninis"] = 160000,
-    ["Gattito Tacoto"] = 165000,
-    ["Las Capuchinas"] = 185000,
-    ["Ballerino Lololo"] = 200000,
-    ["Los Tungtungtungcitos"] = 210000,
-    ["Pakrahmatmamat"] = 215000,
-    ["Ballerina Peppermintina"] = 215000,
-    ["Piccione Macchina"] = 225000,
-    ["Pakrahmatmatina"] = 225000,
-    ["Los Bombinitos"] = 220000,
-    ["Tractoro Dinosauro"] = 230000,
-    ["Brr Es Teh Patipum"] = 225000,
-    ["Cacasito Satalito"] = 240000,
-    ["Orcalita Orcala"] = 240000,
-    ["Aquanaut"] = 245000,
-    ["Tartaruga Cisterna"] = 250000,
-    ["Snailenzo"] = 250000,
-    ["Corn Corn Corn Sahur"] = 250000,
-    ["Squalanana"] = 250000,
-    ["Mummy Ambalabu"] = 250000,
-    ["Los Orcalitos"] = 310000,
-    ["Dug Dug Dug"] = 255000,
-    ["Ginger Globo"] = 257500,
-    ["Yeti Claus"] = 267500,
-    ["Crabbo Limonetta"] = 230000,
-    ["Los Tipi Tacos"] = 260000,
-    ["Tootini Shrimpini"] = 260000,
-    ["Granchiello Spiritell"] = 260000,
-    ["Frio Ninja"] = 265000,
-    ["Piccionetta Macchina"] = 270000,
-    ["Boba Panda"] = 270000,
-    ["Mastodontico Telepiedone"] = 275000,
-    ["Los Gattitos"] = 275000,
-    ["Bambu Bambu Sahur"] = 275000,
-    ["Chrismasmamat"] = 277500,
-    ["Anpali Babel"] = 280000,
-    ["Cappuccino Clownino"] = 285000,
-    ["Luv Luv Luv"] = 282000,
-    ["Bombardini Tortinii"] = 225000,
-    ["Brasilini Berimbini"] = 285000,
-    ["Belula Beluga"] = 290000,
-    ["Krupuk Pagi Pagi"] = 290000,
-    ["Skull Skull Skull"] = 290000,
-    ["Cocoa Assassino"] = 291000,
-    ["Tentacolo Tecnico"] = 295000,
-    ["Ginger Cisterna"] = 293500,
-    ["Dolphini Jetskini"] = 294500,
-    ["Pop Pop Sahur"] = 295000,
-    ["Noo La Polizia"] = 280000,
-    ["Karkerheart Luvkur"] = 297500,
-
-    --SECRET
-    ["La Taco Combinasion"] = 35000000,
-    ["La Vacca Saturno Saturnita"] = 300000,
-    ["Pandanini Frostini"] = 294000,
-    ["Bisonte Giuppitere"] = 300000,
-    ["Blackhole Goat"] = 400000,
-    ["Jackorilla"] = 315000,
-    ["Agarrini Ia Palini"] = 425000,
-    ["Chachechi"] = 400000,
-    ["Karkerkar Kurkur"] = 275000,
-    ["Los Tortus"] = 500000,
-    ["Los Matteos"] = 300000,
-    ["Sammyni Spyderini"] = 300000,
-    ["Trenostruzzo Turbo 4000"] = 310000,
-    ["Chimpanzini Spiderini"] = 325000,
-    ["Boatito Auratito"] = 525000,
-    ["Fragola La La La"] = 450000,
-    ["Dul Dul Dul"] = 375000,
-    ["La Vacca Prese Presente"] = 600000,
-    ["Frankentteo"] = 700000,
-    ["Los Trios"] = 700000,
-    ["Karker Sahur"] = 725000,
-    ["Torrtuginni Dragonfrutini"] = 350000,
-    ["Los Tralaleritos"] = 500000,
-    ["Zombie Tralala"] = 500000,
-    ["La Cucaracha"] = 475000,
-    ["Vulturino Skeletono"] = 500000,
-    ["Guerriro Digitale"] = 550000,
-    ["Extinct Tralalero"] = 450000,
-    ["Yess My Examine"] = 575000,
-    ["Extinct Matteo"] = 625000,
-    ["Las Tralaleritas"] = 650000,
-    ["Rocco Disco"] = 650000,
-    ["Reindeer Tralala"] = 600000,
-    ["Las Vaquitas Saturnitas"] = 750000,
-    ["Pumpkin Spyderini"] = 650000,
-    ["Job Job Job Sahur"] = 700000,
-    ["Los Karkeritos"] = 750000,
-    ["Graipuss Medussi"] = 1000000,
-    ["Santteo"] = 800000,
-    ["La Vacca Jacko Linterino"] = 850000,
-    ["Triplito Tralaleritos"] = 875000,
-    ["Trickolino"] = 900000,
-    ["Giftini Spyderini"] = 999900,
-    ["Los Spyderinis"] = 450000,
-    ["Love Love Love Sahur"] = 1000000,
-    ["Perrito Burrito"] = 1000000,
-    ["1x1x1x1"] = 1100000,
-    ["Los Cucarachas"] = 1200000,
-    ["Please My Present"] = 1300000,
-    ["Cuadramat and Pakrahmatmamat"] = 1400000,
-    ["Los Jobcitos"] = 1500000,
-    ["Nooo My Hotspot"] = 2000000,
-    ["Pot Hotspot"] = 2500000,
-    ["Noo My Examine"] = 1700000,
-    ["Telemorte"] = 2000000,
-    ["La Sahur Combinasion"] = 2000000,
-    ["List List List Sahur"] = 2000000,
-    ["To To To Sahur"] = 2500000,
-    ["Pirulitoita Bicicletaire"] = 2500000,
-    ["25"] = 2500000,
-    ["Santa Hotspot"] = 2600000,
-    ["Horegini Boom"] = 2700000,
-    ["Quesadilla Crocodila"] = 3000000,
-    ["Pot Pumpkin"] = 3000000,
-    ["Naughty Naughty"] = 3000000,
-    ["Cupid Cupid Sahur"] = 3100000,
-    ["Ho Ho Ho Sahur"] = 3200000,
-    ["Mi Gatito"] = 3200000,
-    ["Chicleteira Bicicleteira"] = 3500000,
-    ["Cupid Hotspot"] = 3500000,
-    ["Spaghetti Tualetti"] = 60000000,
-    ["Esok Sekolah"] = 30000000,
-    ["Quesadillo Vampiro"] = 3500000,
-    ["Brunito Marsito"] = 3500000,
-    ["Chill Puppy"] = 4000000,
-    ["Burrito Bandito"] = 4000000,
-    ["Chicleteirina Bicicleteirina"] = 4000000,
-    ["Los Quesadillas"] = 4500000,
-    ["Bunito Bunito Spinito"] = 3000000,
-    ["Noo My Candy"] = 5000000,
-    ["Los Nooo My Hotspotsitos"] = 5000000,
-    ["La Grande Combinassion"] = 10000000,
-    ["Rang Ring Bus"] = 6000000,
-    ["Guest 666"] = 6600000,
-    ["Los Mi Gatitos"] = 6500000,
-    ["Los Chicleteiras"] = 7000000,
-    ["67"] = 7500000,
-    ["Donkeyturbo Express"] = 7500000,
-    ["Mariachi Corazoni"] = 12500000,
-    ["Los Burritos"] = 8500000,
-    ["Los 25"] = 10000000,
-    ["Swag Soda"] = 13000000,
-    ["Noo my Heart"] = 13000000,
-    ["Chimnino"] = 14000000,
-    ["Los Combinasionas"] = 15000000,
-    ["Chicleteira Noelteira"] = 15000000,
-    ["Fishino Clownino"] = 15500000,
-    ["Tacorita Bicicleta"] = 16500000,
-    ["Spinny Hammy"] = 17000000,
-    ["Nuclearo Dinosauro"] = 15000000,
-    ["Las Sis"] = 17500000,
-    ["Chicleteira Cupideira"] = 17500000,
-    ["La Karkerkar Combinasion"] = 17500000,
-    ["Chillin Chili"] = 25000000,
-    ["Chipso and Queso"] = 25000000,
-    ["Money Money Reindeer"] = 25000000,
-    ["Money Money Puggy"] = 21000000,
-    ["Celularcini Viciosini"] = 22500000,
-    ["Los Planitos"] = 18500000,
-    ["Los Mobilis"] = 22000000,
-    ["Los 67"] = 22500000,
-    ["Mieteteira Bicicleteira"] = 26000000,
-    ["Tuff Toucan"] = 26000000,
-    ["La Spooky Grande"] = 24500000,
-    ["Los Spooky Combinasionas"] = 20000000,
-    ["Los Candies"] = 23000000,
-    ["Los Hotspositos"] = 25000000,
-    ["Los Jolly Combinasionas"] = 25000000,
-    ["Los Puggies"] = 30000000,
-    ["W or L"] = 30000000,
-    ["Tralalalaledon"] = 37500000,
-    ["La Extinct Grande"] = 23500000,
-    ["Tralaledon"] = 27500000,
-    ["La Jolly Grande"] = 30000000,
-    ["Los Primos"] = 31000000,
-    ["Bacuru and Egguru"] = 24000000,
-    ["Eviledon"] = 31500000,
-    ["Los Tacoritas"] = 32000000,
-    ["Lovin Rose"] = 32500000,
-    ["Tang Tang Kelentang"] = 33500000,
-    ["Ketupat Kepat"] = 35000000,
-    ["Los Bros"] = 37500000,
-    ["Tictac Sahur"] = 37500000,
-    ["La Romantic Grande"] = 40000000,
-    ["Gingerat Gerat"] = 40000000,
-    ["Orcaledon"] = 40000000,
-    ["Ketchuru and Masturu"] = 42500000,
-    ["Jolly Jolly Sahur"] = 45000000,
-    ["Garama and Madundung"] = 50000000,
-    ["Rosetti Tualetti"] = 50000000,
-    ["Festive 67"] = 67000000,
-    ["Love Love Bear"] = 140000000,
-    ["La Ginger Sekolah"] = 75000000,
-    ["Spooky and Pumpky"] = 80000000,
-    ["Lavadorito Spinito"] = 45000000,
-    ["Los Spaghettis"] = 70000000,
-    ["La Casa Boo"] = 100000000,
-    ["Fragrama and Chocrama"] = 100000000,
-    ["La Secret Combinasion"] = 125000000,
-    ["Reinito Sleighito"] = 140000000,
-    ["Ketupat Bros"] = 145000000,
-    ["Burguro And Fryuro"] = 150000000,
-    ["Cooki and Milki"] = 155000000,
-    ["Capitano Moby"] = 160000000,
-    ["Rosey and Teddy"] = 165000000,
-    ["Popcuru and Fizzuru"] = 170000000,
-    ["Cerberus"] = 175000000,
-    ["La Supreme Combinasion"] = 200000000,
-    ["Dragon Cannelloni"] = 250000000,
-    ["Dragon Gingerini"] = 300000000,
-    ["Headless Horseman"] = 325000000,
-    ["Hydra Dragon Cannelloni"] = 350000000,
-    ["Skibidi Toilet"] = 400000000,
-    ["Meowl"] = 500000000,
-    ["Strawberry Elephant"] = 750000000
-
-}
 
 -- ══════════════════════════════════════════
 --  THEME — Pitch Black Modern
@@ -446,37 +184,94 @@ local function fetchGistData()
     return ok and result or nil
 end
 
+-- Kill any previous instance
+if getgenv().BrainrotCleanup then
+    pcall(getgenv().BrainrotCleanup)
+    getgenv().BrainrotCleanup = nil
+    task.wait(0.5)
+end
+
+-- Force cleanup any existing GUIs
+for _, gui in ipairs(CoreGui:GetChildren()) do
+    if gui.Name == "BrainrotViewerV3" then
+        pcall(function() gui:Destroy() end)
+    end
+end
+task.wait(0.5)
+
 -- ══════════════════════════════════════════
 --  BUILD GUI
 -- ══════════════════════════════════════════
+-- Settings management (defined early for use in buildGUI)
+local SETTINGS_FILE = "ClyNotify_Settings.json"
+
+local function loadSettings()
+    if not isfile then return {} end
+    local success, result = pcall(function()
+        if isfile(SETTINGS_FILE) then
+            return HttpService:JSONDecode(readfile(SETTINGS_FILE))
+        end
+        return {}
+    end)
+    return success and result or {}
+end
+
+local saveDebounce = false
+local function saveSettings(settings)
+    if not writefile or saveDebounce then return end
+    saveDebounce = true
+    task.delay(0.5, function()
+        pcall(function()
+            writefile(SETTINGS_FILE, HttpService:JSONEncode(settings))
+        end)
+        saveDebounce = false
+    end)
+end
+
 local function buildGUI()
-    local old = CoreGui:FindFirstChild("BrainrotViewerV3")
-    if old then old:Destroy() end
+    -- Clean up any existing GUI instances
+    for _, gui in ipairs(CoreGui:GetChildren()) do
+        if gui.Name == "BrainrotViewerV3" then
+            pcall(function() gui:Destroy() end)
+        end
+    end
+    task.wait(0.3) -- Wait for cleanup to complete
 
     local sg = Instance.new("ScreenGui")
     sg.Name = "BrainrotViewerV3"
     sg.ResetOnSpawn = false
     sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-    -- ── Main Window (compact: 560 × 460) ───────
+        -- ── Main Window (compact: 560 × 460) ───────
     local win = Instance.new("Frame")
     win.Name = "Window"
     win.Size = UDim2.new(0, 560, 0, 460)
-    win.Position = UDim2.new(0.5, -280, 0.5, -230)
+    
+    -- Load saved position or use default
+    local savedSettings = loadSettings()
+    if savedSettings.windowPosition then
+        win.Position = UDim2.new(
+            savedSettings.windowPosition.X.Scale,
+            savedSettings.windowPosition.X.Offset,
+            savedSettings.windowPosition.Y.Scale,
+            savedSettings.windowPosition.Y.Offset
+        )
+    else
+        win.Position = UDim2.new(0.5, -280, 0.5, -230)
+    end
+    
     win.BackgroundColor3 = T.Bg
     win.BorderSizePixel = 0
     win.Parent = sg
     corner(win, 8)
     stroke(win, T.BorderBright, 1, 0)
 
-    -- ── Title Bar (34px) ───────────────────────
-    local titleBar = Instance.new("TextButton")
+        -- ── Title Bar (34px) ───────────────────────
+    local titleBar = Instance.new("Frame")
     titleBar.Name = "TitleBar"
     titleBar.Size = UDim2.new(1,0,0,34)
     titleBar.BackgroundColor3 = T.Panel
     titleBar.BorderSizePixel = 0
-    titleBar.Text = ""
-    titleBar.AutoButtonColor = false
     titleBar.Parent = win
     corner(titleBar, 8)
     
@@ -554,7 +349,19 @@ local function buildGUI()
     statusBarLbl.ZIndex = 101
     statusBarLbl.Parent = statusBar
 
-    -- Logo dot
+                    -- Drag handle (invisible TextButton, covers entire title bar for dragging)
+    local dragHandle = Instance.new("TextButton")
+    dragHandle.Name = "DragHandle"
+    dragHandle.Size = UDim2.new(1,-310,1,0)  -- Entire title bar except right side buttons
+    dragHandle.Position = UDim2.new(0,0,0,0)
+    dragHandle.BackgroundTransparency = 1
+    dragHandle.Text = ""
+    dragHandle.TextTransparency = 1
+    dragHandle.AutoButtonColor = false
+    dragHandle.ZIndex = 10  -- Above everything else in title bar
+    dragHandle.Parent = titleBar
+
+        -- Logo dot
     local logoDot = frm(titleBar, {sz=UDim2.new(0,8,0,8), pos=UDim2.new(0,12,0,13), bg=T.Green})
     corner(logoDot, 4)
 
@@ -729,7 +536,7 @@ autoGrabPad.Parent = autoGrabScroll
 
 -- Auto Grab Card
 local autoGrabCard = Instance.new("Frame")
-autoGrabCard.Size = UDim2.new(1,0,0,120)
+autoGrabCard.Size = UDim2.new(1,0,0,80)
 autoGrabCard.BackgroundColor3 = T.Panel
 autoGrabCard.BorderSizePixel = 0
 autoGrabCard.LayoutOrder = 1
@@ -744,34 +551,34 @@ lbl(autoGrabCard, {
     align=Enum.TextXAlignment.Left
 })
 
--- Toggle function
-local function createToggle(parent, text, yPos, order)
-    local toggle = Instance.new("TextButton")
-    toggle.Size = UDim2.new(1,-20,0,32)
-    toggle.Position = UDim2.new(0,10,0,yPos)
-    toggle.BackgroundColor3 = T.Card
-    toggle.Text = ""
-    toggle.BorderSizePixel = 0
-    toggle.AutoButtonColor = false
-    toggle.Parent = parent
-    corner(toggle, 4)
-    stroke(toggle, T.Border, 1, 0)
-    
-    local indicator = frm(toggle, {sz=UDim2.new(0,20,0,20), pos=UDim2.new(0,8,0,6), bg=T.Bg})
-    corner(indicator, 4)
-    stroke(indicator, T.Border, 1, 0)
-    
-    lbl(toggle, {
-        text=text, size=11, color=T.Text, font=Enum.Font.Code,
-        sz=UDim2.new(1,-40,1,0), pos=UDim2.new(0,36,0,0),
-        align=Enum.TextXAlignment.Left
-    })
-    
-    return toggle, indicator
-end
+-- Nearest toggle
+local nearestToggle = Instance.new("TextButton")
+nearestToggle.Size = UDim2.new(1,-20,0,32)
+nearestToggle.Position = UDim2.new(0,10,0,36)
+nearestToggle.BackgroundColor3 = T.Card
+nearestToggle.Text = ""
+nearestToggle.BorderSizePixel = 0
+nearestToggle.AutoButtonColor = false
+nearestToggle.Parent = autoGrabCard
+corner(nearestToggle, 4)
+stroke(nearestToggle, T.Border, 1, 0)
 
-local nearestToggle, nearestIndicator = createToggle(autoGrabCard, "Auto Grab Nearest", 36, 1)
-local highestToggle, highestIndicator = createToggle(autoGrabCard, "Auto Grab Highest Value", 76, 2)
+local nearestIndicator = frm(nearestToggle, {sz=UDim2.new(0,20,0,20), pos=UDim2.new(0,8,0,6), bg=T.Bg})
+corner(nearestIndicator, 4)
+stroke(nearestIndicator, T.Border, 1, 0)
+
+lbl(nearestToggle, {
+    text="Auto Grab Nearest", size=11, color=T.Text, font=Enum.Font.Code,
+    sz=UDim2.new(1,-40,1,0), pos=UDim2.new(0,36,0,0),
+    align=Enum.TextXAlignment.Left
+})
+
+nearestToggle.MouseEnter:Connect(function()
+    nearestToggle.BackgroundColor3 = T.CardHover
+end)
+nearestToggle.MouseLeave:Connect(function()
+    nearestToggle.BackgroundColor3 = T.Card
+end)
 
     local miscLayout = Instance.new("UIListLayout")
     miscLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -785,12 +592,57 @@ local highestToggle, highestIndicator = createToggle(autoGrabCard, "Auto Grab Hi
     miscPad.PaddingRight  = UDim.new(0,6)
     miscPad.Parent = miscScroll
 
+        -- Misc tab: Auto Hop toggle
+    local autoHopCard = Instance.new("Frame")
+    autoHopCard.Size = UDim2.new(1,0,0,80)
+    autoHopCard.BackgroundColor3 = T.Panel
+    autoHopCard.BorderSizePixel = 0
+    autoHopCard.LayoutOrder = 1
+    autoHopCard.Parent = miscScroll
+    corner(autoHopCard, 6)
+    stroke(autoHopCard, T.Border, 1, 0)
+    
+    lbl(autoHopCard, {
+        text="Auto Server Hop",
+        size=12, color=T.Text, font=Enum.Font.Code,
+        sz=UDim2.new(1,-16,0,20), pos=UDim2.new(0,10,0,8),
+        align=Enum.TextXAlignment.Left
+    })
+    
+    local autoHopToggle = Instance.new("TextButton")
+    autoHopToggle.Size = UDim2.new(1,-20,0,32)
+    autoHopToggle.Position = UDim2.new(0,10,0,36)
+    autoHopToggle.BackgroundColor3 = T.Card
+    autoHopToggle.Text = ""
+    autoHopToggle.BorderSizePixel = 0
+    autoHopToggle.AutoButtonColor = false
+    autoHopToggle.Parent = autoHopCard
+    corner(autoHopToggle, 4)
+    stroke(autoHopToggle, T.Border, 1, 0)
+    
+    local autoHopIndicator = frm(autoHopToggle, {sz=UDim2.new(0,20,0,20), pos=UDim2.new(0,8,0,6), bg=T.Bg})
+    corner(autoHopIndicator, 4)
+    stroke(autoHopIndicator, T.Border, 1, 0)
+    
+        lbl(autoHopToggle, {
+        text="Auto hop to servers with rare brainrots", size=11, color=T.Text, font=Enum.Font.Code,
+        sz=UDim2.new(1,-40,1,0), pos=UDim2.new(0,36,0,0),
+        align=Enum.TextXAlignment.Left
+    })
+    
+        autoHopToggle.MouseEnter:Connect(function()
+        autoHopToggle.BackgroundColor3 = T.CardHover
+    end)
+    autoHopToggle.MouseLeave:Connect(function()
+        autoHopToggle.BackgroundColor3 = T.Card
+    end)
+
     -- Misc tab: Current Job ID display
     local currentJobCard = Instance.new("Frame")
     currentJobCard.Size = UDim2.new(1,0,0,70)
     currentJobCard.BackgroundColor3 = T.Panel
     currentJobCard.BorderSizePixel = 0
-    currentJobCard.LayoutOrder = 1
+    currentJobCard.LayoutOrder = 2
     currentJobCard.Parent = miscScroll
     corner(currentJobCard, 6)
     stroke(currentJobCard, T.Border, 1, 0)
@@ -826,12 +678,12 @@ local highestToggle, highestIndicator = createToggle(autoGrabCard, "Auto Grab Hi
     currentJobPad.PaddingRight = UDim.new(0,8)
     currentJobPad.Parent = currentJobIdBox
 
-        -- Misc tab: Join by Job ID section
+                -- Misc tab: Join by Job ID section
     local joinCard = Instance.new("Frame")
     joinCard.Size = UDim2.new(1,0,0,80)
     joinCard.BackgroundColor3 = T.Panel
     joinCard.BorderSizePixel = 0
-    joinCard.LayoutOrder = 2
+    joinCard.LayoutOrder = 3
     joinCard.Parent = miscScroll
     corner(joinCard, 6)
     stroke(joinCard, T.Border, 1, 0)
@@ -946,20 +798,22 @@ miscTab.MouseButton1Click:Connect(function() switchTab("Misc") end)
         miscTab.BackgroundColor3 = T.Card
     end)
 
-    -- Set initial tab
+        -- Set initial tab
     switchTab("Servers")
 
     sg.Parent = CoreGui
 
-               return {
-    gui=sg, win=win, titleBar=titleBar, 
-    serversScroll=serversScroll, autoGrabScroll=autoGrabScroll, miscScroll=miscScroll,
-    statusLbl=statusLbl, totalLbl=totalLbl, serverLbl=serverLbl,
-    closeBtn=closeBtn, minimizeBtn=minimizeBtn, resyncBtn=resyncBtn,
-    statusBar=statusBar, statusBarLbl=statusBarLbl,
-    serversTab=serversTab, autoGrabTab=autoGrabTab, miscTab=miscTab,
-    jobIdInput=jobIdInput, joinBtn=joinBtn,
-}
+        return {
+        gui=sg, win=win, titleBar=titleBar, dragHandle=dragHandle,
+        serversScroll=serversScroll, autoGrabScroll=autoGrabScroll, miscScroll=miscScroll,
+        statusLbl=statusLbl, totalLbl=totalLbl, serverLbl=serverLbl,
+        closeBtn=closeBtn, minimizeBtn=minimizeBtn, resyncBtn=resyncBtn,
+        statusBar=statusBar, statusBarLbl=statusBarLbl,
+        serversTab=serversTab, autoGrabTab=autoGrabTab, miscTab=miscTab,
+        jobIdInput=jobIdInput, joinBtn=joinBtn,
+        nearestToggle=nearestToggle, nearestIndicator=nearestIndicator,
+        autoHopToggle=autoHopToggle, autoHopIndicator=autoHopIndicator,
+    }
 end
 
 -- ══════════════════════════════════════════
@@ -1286,6 +1140,25 @@ end
 -- ══════════════════════════════════════════
 local function main()
     local ui = buildGUI()
+
+local alive = true  -- all loops check this
+
+    getgenv().BrainrotCleanup = function()
+        alive = false
+        -- stop auto grab thread
+        if autoGrabThread then
+            task.cancel(autoGrabThread)
+            autoGrabThread = nil
+        end
+        autoGrabMode = nil
+        -- destroy gui
+        if ui and ui.gui and ui.gui.Parent then
+            ui.gui:Destroy()
+        end
+    end
+
+
+
     local TeleportService = game:GetService("TeleportService")
 
     -- Single shared syncedAt — updated whenever we successfully sync
@@ -1295,14 +1168,72 @@ local function main()
     local AUTO_RESYNC_INTERVAL = 30
     local currentPlaceId = 109983668079237  -- Default place ID
 
-    -- Status bar helper: update persistent status message (DEFINE EARLY)
+        -- Status bar helper: update persistent status message (DEFINE EARLY)
     local function updateStatusBar(msg, col)
         ui.statusBarLbl.Text = msg
         ui.statusBarLbl.TextColor3 = col or T.TextMid
     end
 
+    -- Auto Hop variables
+    local autoHopEnabled = false
+    local autoHopPending = false
+    local MAX_BRAINROT_AGE = 180
+
+    -- Auto Hop logic: MUST be defined before doSync
+    local function checkAndHop(data)
+        if not autoHopEnabled or autoHopPending then return end
+        if not data or not data.brainrots or #data.brainrots == 0 then return end
+        
+        local now = os.time()
+        local newestServer = nil
+        local newestTime = 0
+        
+        for _, br in ipairs(data.brainrots) do
+            local sid = br.serverId
+            local foundAt = br.foundAt or 0
+            local age = now - foundAt
+            
+            if sid and sid ~= game.JobId and foundAt > 0 and age <= MAX_BRAINROT_AGE then
+                if foundAt > newestTime then
+                    newestTime = foundAt
+                    newestServer = {
+                        id = sid,
+                        placeId = data.placeId,
+                        name = br.name,
+                        age = age,
+                        playerCount = br.playerCount or 0
+                    }
+                end
+            end
+        end
+        
+        if not newestServer then
+            updateStatusBar("Auto Hop: No fresh brainrots (all >3min old)", T.Orange)
+            return
+        end
+        
+        autoHopPending = true
+        local ageStr = newestServer.age < 60 and newestServer.age.."s" or math.floor(newestServer.age/60).."m"
+        updateStatusBar("🚀 NEW FIND! Hopping to " .. newestServer.name .. " (" .. ageStr .. " ago)", T.Yellow)
+        
+        task.wait(0.5)
+        
+        if autoHopEnabled then
+            local success, err = pcall(function()
+                TeleportService:TeleportToPlaceInstance(newestServer.placeId, newestServer.id, Players.LocalPlayer)
+            end)
+            
+            if not success then
+                autoHopPending = false
+                updateStatusBar("Auto Hop: Teleport failed - " .. tostring(err), T.Red)
+            end
+        else
+            autoHopPending = false
+        end
+    end
+
     ui.closeBtn.MouseButton1Click:Connect(function()
-        ui.gui:Destroy()
+        getgenv().BrainrotCleanup()
     end)
 
     -- Join by Job ID functionality (same mechanism as server panel join buttons)
@@ -1335,7 +1266,7 @@ local function main()
 
     -- One persistent ticker that reads syncedAt — never respawned
     task.spawn(function()
-        while ui.gui.Parent do
+        while alive and ui.gui.Parent do
             task.wait(1)
             if not ui.gui.Parent then break end
             local d = os.time() - syncedAt
@@ -1368,13 +1299,16 @@ local function main()
         -- Always reset the timer on every sync attempt
         syncedAt = os.time()
 
-                if ui.gui.Parent and newData then
+                                if ui.gui.Parent and newData then
             if newData.timestamp ~= prevTimestamp then
                 lastKnownTimestamp = newData.timestamp
                 local newCount = #(newData.brainrots or {})
                 currentPlaceId = newData.placeId or currentPlaceId  -- Update place ID
                 updateGUI(ui, newData)
                 updateStatusBar("✓ Synced — " .. newCount .. " brainrot(s) found", T.Green)
+                
+                -- Trigger auto hop check after successful sync
+                checkAndHop(newData)
             else
                 updateStatusBar("— No new brainrots since last sync", T.TextDim)
             end
@@ -1402,7 +1336,7 @@ local function main()
 
         -- Auto loop: check every REFRESH_INTERVAL (5s), force-resync every 30s
     task.spawn(function()
-        while ui.gui.Parent do
+        while alive and ui.gui.Parent do
             task.wait(REFRESH_INTERVAL)
             if not ui.gui.Parent then break end
             local shouldForce = (os.time() - lastAutoSync) >= AUTO_RESYNC_INTERVAL
@@ -1412,92 +1346,127 @@ local function main()
         end
     end)
 
-    -- Auto Grab System
-local autoGrabMode = nil -- "nearest" or "highest"
+            -- Auto Grab System
+local autoGrabMode = nil
 local autoGrabThread = nil
 
+-- Auto Hop System (remaining variables)
+local lastHopTime = 0
+local HOP_COOLDOWN = 120
+
+
+
 local function findStealablePrompts()
-    local prompts = {}
-    local plotsFolder = workspace:FindFirstChild("Plots")
-    if not plotsFolder then return prompts end
-    
+    local promptsByPlot = {}
+    local plotsFolder = workspace:FindFirstChild("Plots") or workspace:FindFirstChild("AnimalPodiums")
+    if not plotsFolder then 
+        return {} 
+    end
+
     for _, obj in ipairs(plotsFolder:GetDescendants()) do
         if obj:IsA("ProximityPrompt") then
             local actionText = obj.ActionText or ""
             local objectText = obj.ObjectText or ""
-            
+
             if (actionText:match("Steal") or actionText:match("Grab")) and objectText ~= "" then
-                local parent = obj.Parent
-                if parent and parent:IsA("Attachment") then
-                    local spawnPart = parent.Parent
-                    if spawnPart and spawnPart:IsA("BasePart") then
-                        table.insert(prompts, {
-                            prompt = obj,
-                            position = spawnPart.Position,
-                            name = objectText,
-                            income = incomeByName[objectText] or 0
-                        })
+                local attachment = obj.Parent
+                if attachment and attachment:IsA("Attachment") then
+                    local spawnPart = attachment.Parent
+                    if spawnPart and spawnPart:IsA("BasePart") and spawnPart.Name == "Spawn" then
+                        local baseModel = spawnPart.Parent
+                        if baseModel and baseModel:IsA("Model") and baseModel.Name == "Base" then
+                            local plotNumber = baseModel.Parent
+                            if plotNumber and plotNumber:IsA("Model") then
+                                local animalPodiums = plotNumber.Parent
+                                local playerPlot = animalPodiums and animalPodiums.Parent
+                                
+                                -- Check if this plot belongs to the current player (skip own plot)
+                                local isOwnPlot = false
+                                if playerPlot then
+                                    local ownerAttr = playerPlot:GetAttribute("Owner") or playerPlot:GetAttribute("PlotOwner") or playerPlot:GetAttribute("PlayerName")
+                                    local ownerValue = playerPlot:FindFirstChild("Owner") or playerPlot:FindFirstChild("PlotOwner")
+                                    
+                                    if ownerAttr then
+                                        if tostring(ownerAttr) == Players.LocalPlayer.Name or tostring(ownerAttr) == tostring(Players.LocalPlayer.UserId) then
+                                            isOwnPlot = true
+                                        end
+                                    elseif ownerValue and ownerValue:IsA("ValueBase") then
+                                        if tostring(ownerValue.Value) == Players.LocalPlayer.Name or tostring(ownerValue.Value) == tostring(Players.LocalPlayer.UserId) then
+                                            isOwnPlot = true
+                                        end
+                                    end
+                                end
+                                
+                                -- Only process if this is NOT the player's own plot
+                                if not isOwnPlot then
+                                    local plotName = plotNumber.Name
+                                    if not promptsByPlot[plotName] then
+                                        promptsByPlot[plotName] = {}
+                                    end
+                                    table.insert(promptsByPlot[plotName], {
+                                        prompt   = obj,
+                                        position = spawnPart.Position,
+                                        name     = objectText,
+                                    })
+                                end
+                            end
+                        end
                     end
                 end
             end
         end
     end
-    return prompts
+    
+    return promptsByPlot
 end
 
-local function startAutoGrab(mode)
-    if autoGrabThread then
-        task.cancel(autoGrabThread)
-    end
-    
-    autoGrabMode = mode
-    local player = Players.LocalPlayer
-    
+local function startAutoGrab()
+    if autoGrabThread then task.cancel(autoGrabThread) end
+    autoGrabMode = "nearest"
+
     autoGrabThread = task.spawn(function()
-        while autoGrabMode == mode do
-            task.wait(0.3)
-            
-            local character = player.Character
+        while autoGrabMode do
+            task.wait(0.05)
+            local character = Players.LocalPlayer.Character
             if not character then continue end
             local hrp = character:FindFirstChild("HumanoidRootPart")
             if not hrp then continue end
+
+            local promptsByPlot = findStealablePrompts()
             
-            local prompts = findStealablePrompts()
-            if #prompts == 0 then continue end
-            
-            local target = nil
-            
-            if mode == "nearest" then
-                local shortestDist = math.huge
+            -- Grab ONLY the single nearest brainrot across ALL plots
+            local allPrompts = {}
+            for _, prompts in pairs(promptsByPlot) do
                 for _, p in ipairs(prompts) do
-                    local dist = (p.position - hrp.Position).Magnitude
-                    if dist < 30 and dist < shortestDist then
-                        shortestDist = dist
-                        target = p
-                    end
-                end
-            elseif mode == "highest" then
-                local highestIncome = 0
-                for _, p in ipairs(prompts) do
-                    local dist = (p.position - hrp.Position).Magnitude
-                    if dist < 30 and p.income > highestIncome then
-                        highestIncome = p.income
-                        target = p
+                    if p and p.position and p.prompt then
+                        local dist = (p.position - hrp.Position).Magnitude
+                        if dist <= 30 then
+                            table.insert(allPrompts, {prompt = p, dist = dist})
+                        end
                     end
                 end
             end
             
-            if target then
+            -- Find the single nearest one
+            local best = nil
+            local bestDist = math.huge
+            for _, entry in ipairs(allPrompts) do
+                if entry.dist < bestDist then
+                    bestDist = entry.dist
+                    best = entry.prompt
+                end
+            end
+            
+            -- Fire only the nearest one
+            if best then
                 pcall(function()
-                    fireproximityprompt(target.prompt)
+                    fireproximityprompt(best.prompt)
                 end)
             end
         end
     end)
 end
 
-
---autoGrabTab
 local function stopAutoGrab()
     if autoGrabThread then
         task.cancel(autoGrabThread)
@@ -1506,57 +1475,119 @@ local function stopAutoGrab()
     autoGrabMode = nil
 end
 
-nearestToggle.MouseButton1Click:Connect(function()
-    if autoGrabMode == "nearest" then
+ui.nearestToggle.MouseButton1Click:Connect(function()
+    if autoGrabMode then
         stopAutoGrab()
-        nearestIndicator.BackgroundColor3 = T.Bg
+        ui.nearestIndicator.BackgroundColor3 = T.Bg
+        updateStatusBar("Auto Grab disabled", T.TextDim)
     else
-        stopAutoGrab()
-        startAutoGrab("nearest")
-        nearestIndicator.BackgroundColor3 = T.Green
-        highestIndicator.BackgroundColor3 = T.Bg
+        startAutoGrab()
+        ui.nearestIndicator.BackgroundColor3 = T.Green
+        updateStatusBar("Auto Grab: Nearest enabled", T.Green)
     end
 end)
 
-highestToggle.MouseButton1Click:Connect(function()
-    if autoGrabMode == "highest" then
-        stopAutoGrab()
-        highestIndicator.BackgroundColor3 = T.Bg
+-- Load and apply saved settings
+local savedSettings = loadSettings()
+if savedSettings.autoHopEnabled then
+    autoHopEnabled = true
+    ui.autoHopIndicator.BackgroundColor3 = T.Green
+end
+
+-- Hotkey system (mobile-safe)
+local function setupHotkey()
+    local success = pcall(function()
+        UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if input.KeyCode == Enum.KeyCode.Down then
+                -- Toggle minimize
+                minimized = not minimized
+                ui.serversScroll.Visible = not minimized and ui.serversTab.BackgroundColor3 == T.Bg
+                ui.autoGrabScroll.Visible = not minimized and ui.autoGrabTab.BackgroundColor3 == T.Bg
+                ui.miscScroll.Visible = not minimized and ui.miscTab.BackgroundColor3 == T.Bg
+                ui.win.Size = minimized
+                    and UDim2.new(0,560,0,36)
+                    or  UDim2.new(0,560,0,460)
+                ui.minimizeBtn.Text = minimized and "□" or "—"
+            end
+        end)
+    end)
+    if not success then
+        -- Keyboard not available (mobile), silently continue
+    end
+end
+setupHotkey()
+
+-- Auto Hop functionality
+ui.autoHopToggle.MouseButton1Click:Connect(function()
+    autoHopEnabled = not autoHopEnabled
+    
+    -- Save setting
+    local settings = loadSettings()
+    settings.autoHopEnabled = autoHopEnabled
+    saveSettings(settings)
+    
+    if autoHopEnabled then
+        ui.autoHopIndicator.BackgroundColor3 = T.Green
+        updateStatusBar("Auto Hop enabled — waiting for next sync", T.Green)
+        autoHopPending = false
     else
-        stopAutoGrab()
-        startAutoGrab("highest")
-        highestIndicator.BackgroundColor3 = T.Green
-        nearestIndicator.BackgroundColor3 = T.Bg
+        ui.autoHopIndicator.BackgroundColor3 = T.Bg
+        updateStatusBar("Auto Hop disabled", T.TextDim)
+        autoHopPending = false
     end
 end)
 
-        -- Draggable (mobile + desktop)
-    local dragging, dragStart, winStart
-    ui.titleBar.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = inp.Position
-            winStart = ui.win.Position
-            inp.Changed:Connect(function()
-                if inp.UserInputState == Enum.UserInputState.End then dragging = false end
+
+
+                            -- Dragging system (FIXED)
+    local dragToggle = nil
+    local dragSpeed = 0
+    local dragInput = nil
+    local dragStart = nil
+    local startPos = nil
+
+        local function updateInput(input)
+        local Delta = input.Position - dragStart
+        local Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + Delta.X, startPos.Y.Scale, startPos.Y.Offset + Delta.Y)
+        ui.win.Position = Position
+    end
+    
+    local function savePosition()
+        local settings = loadSettings()
+        settings.windowPosition = {
+            X = {Scale = ui.win.Position.X.Scale, Offset = ui.win.Position.X.Offset},
+            Y = {Scale = ui.win.Position.Y.Scale, Offset = ui.win.Position.Y.Offset}
+        }
+        saveSettings(settings)
+    end
+
+                ui.dragHandle.InputBegan:Connect(function(input)
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and UserInputService:GetFocusedTextBox() == nil then
+            dragToggle = true
+            dragStart = input.Position
+            startPos = ui.win.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragToggle = false
+                    savePosition()
+                end
             end)
         end
     end)
-    local lastDrag
-    ui.titleBar.InputChanged:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch then
-            lastDrag = inp
+
+    ui.dragHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
         end
     end)
-    UserInputService.InputChanged:Connect(function(inp)
-        if inp == lastDrag and dragging then
-            local delta = inp.Position - dragStart
-            ui.win.Position = UDim2.new(
-                winStart.X.Scale, winStart.X.Offset + delta.X,
-                winStart.Y.Scale, winStart.Y.Offset + delta.Y
-            )
+
+    game:GetService("RunService").Heartbeat:Connect(function()
+        if dragToggle and dragInput then
+            updateInput(dragInput)
         end
     end)
-end
+end  -- closes main()
 
 main()
+
