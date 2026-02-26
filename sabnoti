@@ -92,21 +92,19 @@ if not player then
     player = Players.PlayerAdded:Wait()
 end
 
-local WEBHOOK_1 = getgenv().Webhook1 or error("❌ Webhook1 not set!")  -- 1m-50m (no ping names)
-local WEBHOOK_2 = getgenv().Webhook2 or error("❌ Webhook2 not set!")  -- 50m-500m (no ping names)
-local WEBHOOK_3 = getgenv().Webhook3 or error("❌ Webhook3 not set!")  -- ping names + 500m+
-local WEBHOOK_4 = getgenv().Webhook4 or error("❌ Webhook4 not set!")  -- everything 10m+
+local WEBHOOK_1 = getgenv().Webhook1 or error("❌ Webhook1 not set!")  -- 10m-50m (no ping)
+local WEBHOOK_2 = getgenv().Webhook2 or error("❌ Webhook2 not set!")  -- 50m+ (@everyone if 500m+ or ping names)
+local WEBHOOK_3 = getgenv().Webhook3 or error("❌ Webhook3 not set!")  -- 1b+ only (always @everyone)
 local WEBHOOK_ERROR = getgenv().WebhookError or error("❌ WebhookError not set!")  -- error logs
 
 -- Debug: Print credentials status
-print("[Config] ✅ All 5 webhooks configured (4 main + 1 error log)")
+print("[Config] ✅ All 4 webhooks configured (3 main + 1 error log)")
 print("[Config] Player:", player.Name)
 print("[Config] Plots found:", #plotsFolder:GetChildren())
-local MIN_INCOME = 5000000  -- 5m minimum for webhook 1
-local WEBHOOK_4_MIN = 10000000  -- 10m minimum for webhook 4
+local MIN_INCOME = 10000000  -- 10m minimum
 local MID_THRESHOLD = 50000000  -- 50m
-local PING_THRESHOLD = 100000000  -- 100m threshold for ping names
 local HIGH_THRESHOLD = 500000000  -- 500m
+local BILLION_THRESHOLD = 1000000000  -- 1b
 local SEND_DELAY = 2
 local SCAN_DELAY = 1.5
 
@@ -1659,30 +1657,24 @@ function sendWebhookGrouped(entries)
     local webhook1Entries = {}
     local webhook2Entries = {}
     local webhook3Entries = {}
-    local webhook4Entries = {}
-    local webhook4HasPingNames = false
-    local webhook4Has300mPlus = false
     
     for _, e in ipairs(dedupedEntries) do
         local income = e.income or 0
         local isPingName = e.isPingName or false
         
-        if (isPingName and income >= PING_THRESHOLD) or (not isPingName and income >= HIGH_THRESHOLD) then
-            table.insert(webhook3Entries, e)
-        end
-        
-        if income >= MIN_INCOME and income < MID_THRESHOLD and not isPingName then
+        -- Webhook 1: 10m-50m only (no ping)
+        if income >= MIN_INCOME and income < MID_THRESHOLD then
             table.insert(webhook1Entries, e)
         end
         
-        if (income >= MID_THRESHOLD and income < HIGH_THRESHOLD and not isPingName) or (isPingName and income < PING_THRESHOLD) then
+        -- Webhook 2: 50m+ (ping if 500m+ or ping names)
+        if income >= MID_THRESHOLD then
             table.insert(webhook2Entries, e)
         end
         
-        if income >= WEBHOOK_4_MIN then
-            table.insert(webhook4Entries, e)
-            if isPingName then webhook4HasPingNames = true end
-            if income >= 300000000 then webhook4Has300mPlus = true end
+        -- Webhook 3: 1b+ only (always ping)
+        if income >= BILLION_THRESHOLD then
+            table.insert(webhook3Entries, e)
         end
     end
     
@@ -1789,17 +1781,25 @@ function sendWebhookGrouped(entries)
         end
     end
     
-    buildAndSend(webhook1Entries, WEBHOOK_1, "WH1 (1m-50m)", false)
+    -- Webhook 1: 10m-50m (no ping)
+    buildAndSend(webhook1Entries, WEBHOOK_1, "WH1 (10m-50m)", false)
     if #webhook1Entries > 0 then task.wait(0.5) end
     
-    buildAndSend(webhook2Entries, WEBHOOK_2, "WH2 (50m-500m)", false)
+    -- Webhook 2: 50m+ (ping if 500m+ or ping names)
+    local shouldPingWH2 = false
+    for _, e in ipairs(webhook2Entries) do
+        if e.income >= HIGH_THRESHOLD or e.isPingName then
+            shouldPingWH2 = true
+            break
+        end
+    end
+    print("[Webhook] WH2 has", #webhook2Entries, "items. Ping:", shouldPingWH2)
+    buildAndSend(webhook2Entries, WEBHOOK_2, "WH2 (50m+)", shouldPingWH2)
     if #webhook2Entries > 0 then task.wait(0.5) end
     
-    buildAndSend(webhook3Entries, WEBHOOK_3, "WH3 (Ping+500m)", true)
-    if #webhook3Entries > 0 then task.wait(0.5) end
-    
-    print("[Webhook] WH4 has", #webhook4Entries, "items. Ping:", webhook4HasPingNames or webhook4Has300mPlus)
-    buildAndSend(webhook4Entries, WEBHOOK_4, "WH4 (Main 10m+)", webhook4HasPingNames or webhook4Has300mPlus)
+    -- Webhook 3: 1b+ only (always ping)
+    print("[Webhook] WH3 has", #webhook3Entries, "items (1b+). Always ping: true")
+    buildAndSend(webhook3Entries, WEBHOOK_3, "WH3 (1b+)", true)
 end
 
 function queueWebhookSend()
@@ -2066,4 +2066,5 @@ plotsFolder.ChildRemoved:Connect(function(plot)
 end)
 
 print("[Scanner] ✅ Initialized!")
-print("[HOP] 📋 Rules: 1min timer | Immediate on ping names/300m+ | Immediate on server full | Immediate on bot detection")
+print("[HOP] 📋 Rules: 1min timer | Immediate on high value | Immediate on server full | Immediate on bot detection")
+print("[Webhook] 📋 Distribution: WH1=10m-50m | WH2=50m+ (@everyone if 500m+/ping) | WH3=1b+ (always @everyone)")
