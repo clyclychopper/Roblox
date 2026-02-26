@@ -61,90 +61,7 @@ do
         Settings.Rendering.EditorQualityLevel = Enum.QualityLevel.Level01
     end)
 
-    -- Reduce texture quality + disable effects
-    pcall(function()
-        for _, v in ipairs(game:GetDescendants()) do
-            if v:IsA("SpecialMesh") then
-                -- keep mesh but don't modify (needed for brainrot models)
-            elseif v:IsA("Sky") then
-                v:Destroy()
-            elseif v:IsA("Atmosphere") then
-                v.Density = 0
-                v.Offset = 0
-            elseif v:IsA("Texture") or v:IsA("Decal") then
-                -- Reduce texture transparency to keep visuals but lower gpu load
-                v.Transparency = math.max(v.Transparency, 0)
-            elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
-                v.Enabled = false
-            elseif v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") then
-                v:Destroy()
-            elseif v:IsA("SelectionBox") or v:IsA("SelectionSphere") then
-                v:Destroy()
-            elseif v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") then
-                v:Destroy()
-            end
-        end
-    end)
-
-    -- Destroy non-essential workspace parts (NOT inside Plots folder)
-    pcall(function()
-        local ws = game:GetService("Workspace")
-        local plotsFolder = ws:FindFirstChild("Plots")
-        local camera = ws.CurrentCamera
-        local terrain = ws:FindFirstChildOfClass("Terrain")
-
-        local KEEP = {
-            [plotsFolder] = true,
-            [camera] = true,
-            [terrain] = true,
-        }
-
-        for _, child in ipairs(ws:GetChildren()) do
-            if not KEEP[child] then
-                -- Keep folders that might be needed
-                if child:IsA("Folder") and child.Name ~= "Plots" then
-                    -- safe to destroy non-plot folders
-                    pcall(function() child:Destroy() end)
-                elseif child:IsA("BasePart") or child:IsA("Model") or child:IsA("MeshPart") then
-                    pcall(function() child:Destroy() end)
-                elseif child:IsA("Sky") or child:IsA("Atmosphere") then
-                    pcall(function() child:Destroy() end)
-                end
-            end
-        end
-    end)
-
-    -- Continuously suppress new particles/effects spawning in non-plot areas
-    task.spawn(function()
-        local ws = game:GetService("Workspace")
-        local plotsFolder = ws:FindFirstChild("Plots")
-
-        game.DescendantAdded:Connect(function(obj)
-            -- Skip anything inside Plots
-            local isInPlots = false
-            local current = obj
-            for _ = 1, 10 do
-                current = current.Parent
-                if not current then break end
-                if current == plotsFolder then
-                    isInPlots = true
-                    break
-                end
-            end
-
-            if not isInPlots then
-                if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
-                    obj.Enabled = false
-                elseif obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") then
-                    pcall(function() obj:Destroy() end)
-                elseif obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
-                    pcall(function() obj:Destroy() end)
-                end
-            end
-        end)
-    end)
-
-    print("[PERF] ✅ Performance optimizations applied: FPS=20, shadows off, particles off, junk destroyed")
+    print("[PERF] ✅ Performance optimizations applied: FPS=20, shadows off, quality reduced")
 end
 
 --// SETTINGS
@@ -1718,6 +1635,20 @@ function sendWebhookGrouped(entries)
         return
     end
     
+    -- DEDUPLICATE ENTRIES
+    local seen = {}
+    local dedupedEntries = {}
+    for _, e in ipairs(entries) do
+        local key = e.line -- Use the full line as unique key
+        if not seen[key] then
+            seen[key] = true
+            table.insert(dedupedEntries, e)
+        end
+    end
+    
+    if #dedupedEntries == 0 then return end
+    print("[Webhook] Deduped:", #entries, "->", #dedupedEntries)
+    
     local webhook1Entries = {}
     local webhook2Entries = {}
     local webhook3Entries = {}
@@ -1725,7 +1656,7 @@ function sendWebhookGrouped(entries)
     local webhook4HasPingNames = false
     local webhook4Has300mPlus = false
     
-    for _, e in ipairs(entries) do
+    for _, e in ipairs(dedupedEntries) do
         local income = e.income or 0
         local isPingName = e.isPingName or false
         
@@ -1876,6 +1807,13 @@ end
 
 function serverHop(reason)
     print(string.format("\n🔄 [HOP] Initiating server hop... Reason: %s", reason or "Timer"))
+    
+    -- Cancel any pending webhook timer
+    if webhookTimer then
+        task.cancel(webhookTimer)
+        webhookTimer = nil
+        print("[HOP] Cancelled pending webhook timer")
+    end
     
     -- Send any pending webhooks first
     if #globalFound > 0 then
