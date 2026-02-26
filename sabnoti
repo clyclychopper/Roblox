@@ -161,6 +161,9 @@ local HIGH_VALUE_THRESHOLD = 100000000  -- 100m
 
 -- Bot usernames to avoid (will hop if detected)
 local BOT_USERNAMES = {
+    ["crimsshadowclubPlays"] = true,
+    ["Ultrazwiftdino"] = true,
+    ["Lucazgangkai"] = true,
     ["Nor4crewHQgames11"] = true,
     ["LadyLucasrbxDev"] = true,
     ["miniRileyliamProJax"] = true,
