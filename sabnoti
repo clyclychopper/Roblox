@@ -260,8 +260,7 @@ local PING_NAMES = {
     ["Eviledon"] = true,
     ["Cooki and Milki"] = true,
     ["Capitano Moby"] = true,
-    ["Headless Horseman"] = true,
-    ["Noo my Heart"] = true
+    ["Headless Horseman"] = true
 
 }
 
