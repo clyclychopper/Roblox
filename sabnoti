@@ -4,18 +4,21 @@ do
     local RunService = game:GetService("RunService")
     local Settings = settings()
 
-    -- Cap FPS to 20
+    -- Cap FPS to 20 (balance between performance and reliability)
     pcall(function()
         Settings.Rendering.FrameRateManager = Enum.FrameRateManagerMode.Off
     end)
 
-    -- Use shared fps cap method
+    -- Use shared fps cap method - 20 FPS for reliable event processing
+    local fpsCapEnabled = not setfpscap
     if setfpscap then
-        pcall(setfpscap, 15)
+        local success = pcall(setfpscap, 20)
+        if not success then
+            fpsCapEnabled = true  -- Fallback if setfpscap fails
+        end
     end
 
     -- Fallback: busy-wait FPS limiter
-    local fpsCapEnabled = not (setfpscap ~= nil and pcall(setfpscap, 20))
     if fpsCapEnabled then
         local TARGET_FPS = 20
         local FRAME_TIME = 1 / TARGET_FPS
@@ -61,14 +64,42 @@ do
         Settings.Rendering.EditorQualityLevel = Enum.QualityLevel.Level01
     end)
 
-    -- DISABLE 3D RENDERING COMPLETELY
+    -- AGGRESSIVE 3D RENDERING DISABLE (WHITE SCREEN MODE)
     pcall(function()
         local ws = game:GetService("Workspace")
-        ws["3DRenderingEnabled"] = false -- Completely disable 3D rendering
-        print("[PERF] 3D Rendering: DISABLED")
+        local cam = ws.CurrentCamera
+        
+        -- Method 1: Disable 3D rendering directly
+        ws["3DRenderingEnabled"] = false
+        
+        -- Method 2: Set camera to blank part
+        local blankPart = Instance.new("Part")
+        blankPart.Anchored = true
+        blankPart.CanCollide = false
+        blankPart.Transparency = 1
+        blankPart.Size = Vector3.new(1, 1, 1)
+        blankPart.Position = Vector3.new(0, 10000, 0)
+        blankPart.Parent = ws
+        
+        if cam then
+            cam.CameraType = Enum.CameraType.Scriptable
+            cam.CFrame = CFrame.new(0, 10000, 0)
+            cam.FieldOfView = 1
+        end
+        
+        -- Method 3: Destroy all visible parts
+        for _, obj in ipairs(ws:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Parent ~= blankPart then
+                obj.Transparency = 1
+            end
+        end
+        
+        print("[PERF] 🔲 WHITE SCREEN MODE: ENABLED")
     end)
 
-    print("[PERF] ✅ Performance optimizations applied: FPS=20, shadows off, quality reduced, 3D rendering DISABLED")
+    print("[PERF] ✅ Performance optimizations applied: FPS=20, shadows off, quality reduced")
+    print("[PERF] 🔲 WHITE SCREEN MODE: Active (3D rendering disabled)")
+    print("[PERF] ⚡ FPS kept at 20 for reliable webhook/scanning performance")
 end
 
 --// SETTINGS
@@ -96,6 +127,22 @@ local WEBHOOK_1 = getgenv().Webhook1 or error("❌ Webhook1 not set!")  -- 10m-5
 local WEBHOOK_2 = getgenv().Webhook2 or error("❌ Webhook2 not set!")  -- 50m+ (@everyone if 500m+ or ping names)
 local WEBHOOK_3 = getgenv().Webhook3 or error("❌ Webhook3 not set!")  -- 1b+ only (always @everyone)
 local WEBHOOK_ERROR = getgenv().WebhookError or error("❌ WebhookError not set!")  -- error logs
+
+-- Validate webhook URLs
+local function validateWebhook(url, name)
+    if not url or type(url) ~= "string" then
+        error(name .. " is not a string")
+    end
+    if not url:match("^https://discord%.com/api/webhooks/") and not url:match("^https://discordapp%.com/api/webhooks/") then
+        error(name .. " is not a valid Discord webhook URL")
+    end
+    return url
+end
+
+WEBHOOK_1 = validateWebhook(WEBHOOK_1, "Webhook1")
+WEBHOOK_2 = validateWebhook(WEBHOOK_2, "Webhook2")
+WEBHOOK_3 = validateWebhook(WEBHOOK_3, "Webhook3")
+WEBHOOK_ERROR = validateWebhook(WEBHOOK_ERROR, "WebhookError")
 
 -- Debug: Print credentials status
 print("[Config] ✅ All 4 webhooks configured (3 main + 1 error log)")
@@ -170,6 +217,7 @@ local BOT_USERNAMES = {
 }
 
 local currentHopTimer = nil
+local isHopping = false  -- Prevent multiple simultaneous hops
 
 local PING_NAMES = {
     ["Rosetti Tualetti"] = true,
@@ -1617,7 +1665,17 @@ local reported = {}
 local scanQueued = {}
 local plotConns = {}
 local globalFound = {}
+local globalFoundKeys = {}  -- Hash set for O(1) deduplication lookup
 local webhookTimer = nil
+
+-- Safe call wrapper for consistent error handling
+local function safeCall(label, fn, ...)
+    local ok, err = pcall(fn, ...)
+    if not ok then
+        warn(string.format("[ERROR] %s failed: %s", label, tostring(err)))
+    end
+    return ok
+end
 
 local function chunkArray(arr, chunkSize)
     local out = {}
@@ -1632,13 +1690,19 @@ local function chunkArray(arr, chunkSize)
 end
 
 function sendWebhookGrouped(entries)
-    if type(entries) ~= "table" or #entries == 0 then return end
+    print("[DEBUG] sendWebhookGrouped called with", #entries, "entries")
+    if type(entries) ~= "table" or #entries == 0 then 
+        print("[DEBUG] No entries to send")
+        return 
+    end
     
     local req = getRequest()
     if not req then
         warn("[Webhook] No request function found")
+        warn("[DEBUG] Available functions: syn=", syn ~= nil, "http=", http ~= nil, "http_request=", http_request ~= nil, "request=", request ~= nil)
         return
     end
+    print("[DEBUG] Request function found:", req)
     
     -- DEDUPLICATE ENTRIES
     local seen = {}
@@ -1651,8 +1715,17 @@ function sendWebhookGrouped(entries)
         end
     end
     
-    if #dedupedEntries == 0 then return end
+    if #dedupedEntries == 0 then 
+        print("[DEBUG] All entries were duplicates")
+        return 
+    end
     print("[Webhook] Deduped:", #entries, "->", #dedupedEntries)
+    
+    -- Debug: Print first entry
+    if #dedupedEntries > 0 then
+        local first = dedupedEntries[1]
+        print("[DEBUG] First entry - Income:", first.income, "IsPing:", first.isPingName, "Line:", first.line:sub(1, 50))
+    end
     
     local webhook1Entries = {}
     local webhook2Entries = {}
@@ -1662,13 +1735,13 @@ function sendWebhookGrouped(entries)
         local income = e.income or 0
         local isPingName = e.isPingName or false
         
-        -- Webhook 1: 10m-50m only (no ping)
-        if income >= MIN_INCOME and income < MID_THRESHOLD then
+        -- Webhook 1: 10m-50m only (no ping names)
+        if income >= MIN_INCOME and income < MID_THRESHOLD and not isPingName then
             table.insert(webhook1Entries, e)
         end
         
-        -- Webhook 2: 50m+ (ping if 500m+ or ping names)
-        if income >= MID_THRESHOLD then
+        -- Webhook 2: 50m+ OR ping names (ping if 500m+ or ping names)
+        if income >= MID_THRESHOLD or isPingName then
             table.insert(webhook2Entries, e)
         end
         
@@ -1782,8 +1855,11 @@ function sendWebhookGrouped(entries)
     end
     
     -- Webhook 1: 10m-50m (no ping)
-    buildAndSend(webhook1Entries, WEBHOOK_1, "WH1 (10m-50m)", false)
-    if #webhook1Entries > 0 then task.wait(0.5) end
+    print("[DEBUG] WH1 entries:", #webhook1Entries)
+    if #webhook1Entries > 0 then
+        buildAndSend(webhook1Entries, WEBHOOK_1, "WH1 (10m-50m)", false)
+        task.wait(0.5)
+    end
     
     -- Webhook 2: 50m+ (ping if 500m+ or ping names)
     local shouldPingWH2 = false
@@ -1802,20 +1878,32 @@ function sendWebhookGrouped(entries)
     buildAndSend(webhook3Entries, WEBHOOK_3, "WH3 (1b+)", true)
 end
 
-function queueWebhookSend()
+function queueWebhookSend(isHighValue)
+    print("[DEBUG] queueWebhookSend called, globalFound:", #globalFound, "highValue:", isHighValue or false)
+    
     if webhookTimer then
         task.cancel(webhookTimer)
+        print("[DEBUG] Cancelled existing timer")
     end
     
-    webhookTimer = task.delay(SEND_DELAY, function()
+    local delay = isHighValue and 0.5 or SEND_DELAY
+    
+    webhookTimer = task.delay(delay, function()
         webhookTimer = nil
-        if #globalFound == 0 then return end
+        print("[DEBUG] Timer fired, globalFound:", #globalFound)
+        if #globalFound == 0 then 
+            print("[DEBUG] No items to send")
+            return 
+        end
         
         print("[Webhook] Sending batch of", #globalFound, "items")
-        sendWebhookGrouped(globalFound)
+        safeCall("sendWebhookGrouped", sendWebhookGrouped, globalFound)
         
         table.clear(globalFound)
+        table.clear(globalFoundKeys)  -- Clear hash set too
     end)
+    
+    print("[DEBUG] Timer set for", delay, "seconds")
 end
 
 --// SERVER HOP SYSTEM
@@ -1830,80 +1918,118 @@ local function checkForBots()
 end
 
 function serverHop(reason)
+    -- Prevent multiple simultaneous hop attempts
+    if isHopping then
+        print("[HOP] ⚠️ Already hopping, ignoring duplicate request")
+        return
+    end
+    isHopping = true
+    
+    -- Safety timeout: reset isHopping after 10s in case teleport fails
+    task.delay(10, function()
+        if isHopping then
+            warn("[HOP] ⚠️ Hop timeout - resetting isHopping flag")
+            isHopping = false
+        end
+    end)
+    
     print(string.format("\n🔄 [HOP] Initiating server hop... Reason: %s", reason or "Timer"))
     
-    -- Cancel any pending webhook timer
+    -- Cancel hop timer
+    if currentHopTimer then
+        task.cancel(currentHopTimer)
+        currentHopTimer = nil
+    end
+    
+    -- Cancel any pending webhook timer and send immediately
     if webhookTimer then
         task.cancel(webhookTimer)
         webhookTimer = nil
         print("[HOP] Cancelled pending webhook timer")
+        
+        -- Send any pending webhooks first
+        if #globalFound > 0 then
+            print("[HOP] Sending pending webhooks before hopping...")
+            safeCall("sendWebhookGrouped", sendWebhookGrouped, globalFound)
+            table.clear(globalFound)
+            table.clear(globalFoundKeys)  -- Clear hash set too
+            task.wait(0.5)  -- Brief wait for HTTP request to complete
+        end
     end
     
-    -- Send any pending webhooks first
-    if #globalFound > 0 then
-        print("[HOP] Sending pending webhooks before hopping...")
-        sendWebhookGrouped(globalFound)
-        table.clear(globalFound)
-        task.wait(1)
+    -- Clean up all connections and memory
+    print("[HOP] Cleaning up connections...")
+    for plot, conn in pairs(plotConns) do
+        if conn then
+            pcall(function() conn:Disconnect() end)
+        end
     end
+    table.clear(plotConns)
+    table.clear(reported)
+    table.clear(scanQueued)
+    table.clear(globalFound)
+    table.clear(globalFoundKeys)  -- Clear hash set too
     
+    -- Attempt server hop with fallback
     local success, errorMsg = pcall(function()
         local placeId = game.PlaceId
         local servers = {}
         
         print("[HOP] Fetching server list...")
-        local cursor = ""
-        local attempts = 0
         
-        repeat
-            attempts += 1
-            if attempts > 3 then break end
+        -- Try to get server list with timeout
+        local listSuccess, _listError = pcall(function()
+            local cursor = ""
+            local attempts = 0
+            local maxAttempts = 2  -- Reduced from 3 for faster fallback
             
-            local url = string.format(
-                "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100&cursor=%s",
-                placeId, cursor
-            )
-            
-            local response = game:HttpGet(url)
-            local data = HttpService:JSONDecode(response)
-            
-            if data and data.data then
-                for _, server in ipairs(data.data) do
-                    if server.id ~= game.JobId and server.playing < server.maxPlayers then
-                        table.insert(servers, server.id)
+            repeat
+                attempts += 1
+                if attempts > maxAttempts then break end
+                
+                local url = string.format(
+                    "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100&cursor=%s",
+                    placeId, cursor
+                )
+                
+                local response = game:HttpGet(url)
+                local data = HttpService:JSONDecode(response)
+                
+                if data and data.data then
+                    for _, server in ipairs(data.data) do
+                        if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                            table.insert(servers, server.id)
+                        end
                     end
+                    cursor = data.nextPageCursor or ""
+                else
+                    break
                 end
-                cursor = data.nextPageCursor or ""
-            else
-                warn("[HOP] Invalid server list response, retrying...")
-                cursor = ""
-            end
-        until cursor == ""
+            until cursor == "" or #servers >= 50  -- Stop early if we have enough servers
+        end)
         
-        if #servers > 0 then
+        if listSuccess and #servers > 0 then
             local randomServer = servers[math.random(1, #servers)]
-            print(string.format("[HOP] Found %d servers. Teleporting...", #servers))
+            print(string.format("[HOP] Found %d servers. Teleporting to random server...", #servers))
             TeleportService:TeleportToPlaceInstance(placeId, randomServer, player)
         else
-            warn("[HOP] No servers found, rejoining...")
+            warn("[HOP] Server list failed or empty, using simple rejoin...")
             TeleportService:Teleport(placeId, player)
         end
     end)
     
     if not success then
-        warn("[HOP] Failed:", errorMsg)
-        TeleportService:Teleport(game.PlaceId, player)
+        warn("[HOP] Critical error:", errorMsg)
+        -- Last resort: simple teleport
+        pcall(function()
+            TeleportService:Teleport(game.PlaceId, player)
+        end)
     end
 end
 
 function checkServerFull()
     local playerCount = #Players:GetPlayers()
-    if playerCount >= MAX_PLAYERS then
-        print(string.format("[HOP] ⚠️ Server full (%d/%d players) - Hopping!", playerCount, MAX_PLAYERS))
-        serverHop("Server Full")
-        return true
-    end
-    return false
+    return playerCount >= MAX_PLAYERS
 end
 
 -- Start 1-minute hop timer
@@ -1962,10 +2088,14 @@ function scanPlot(plot)
 
                     local finalIncome, traitList = computeIncome(baseIncome, mutation, trait)
                     
+                    print("[DEBUG] Found:", displayName, "Income:", finalIncome, "Min:", MIN_INCOME, "Passes:", finalIncome >= MIN_INCOME)
+                    
                     if finalIncome >= MIN_INCOME then
                         local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
                         local mutationText = mutation or "None"
                         local isPingName = PING_NAMES[cleanName] or false
+                        
+                        print("[DEBUG] Adding to queue:", displayName, "Income:", short(finalIncome))
 
                         if isPingName or finalIncome >= HIGH_VALUE_THRESHOLD then
                             shouldHopImmediate = true
@@ -1981,16 +2111,9 @@ function scanPlot(plot)
                         -- Create unique key for global deduplication
                         local globalKey = plot.Name .. "|" .. key
                         
-                        -- Check if already in globalFound
-                        local alreadyQueued = false
-                        for _, existing in ipairs(globalFound) do
-                            if existing.globalKey == globalKey then
-                                alreadyQueued = true
-                                break
-                            end
-                        end
-                        
-                        if not alreadyQueued then
+                        -- O(1) hash set lookup instead of O(n) linear search
+                        if not globalFoundKeys[globalKey] then
+                            globalFoundKeys[globalKey] = true  -- Mark as seen
                             table.insert(foundList, {
                                 rarity = rarity,
                                 income = finalIncome,
@@ -2009,21 +2132,30 @@ function scanPlot(plot)
         for _, line in ipairs(foundList) do
             table.insert(globalFound, line)
         end
-        queueWebhookSend()
+        
+        -- Queue webhook with priority flag
+        queueWebhookSend(shouldHopImmediate)
         
         print(string.format("[Scanner] ✅ Found %d brainrots in %s", #foundList, plot.Name))
         
+        -- Priority: High value > Server full (no race conditions)
         if shouldHopImmediate then
             print("[HOP] 🚀 High value detected - hopping after webhook...")
-            task.delay(2, function()
-                serverHop("High Value Brainrot")
+            task.delay(2.5, function()
+                if not isHopping then
+                    serverHop("High Value Brainrot")
+                end
             end)
-        elseif checkServerFull() then
-            -- Already hops inside checkServerFull
+        elseif checkServerFull() and not isHopping then
+            print(string.format("[HOP] ⚠️ Server full (%d/%d players) - Hopping!", #Players:GetPlayers(), MAX_PLAYERS))
+            task.delay(1, function()
+                if not isHopping then
+                    serverHop("Server Full")
+                end
+            end)
         end
     end
 end
-
 --// PLOT HOOKING & INITIALIZATION
 local function hookPlot(plot)
     if plotConns[plot] then
@@ -2031,7 +2163,7 @@ local function hookPlot(plot)
         plotConns[plot] = nil
     end
     
-    scanPlot(plot)
+    safeCall("scanPlot", scanPlot, plot)
     
     plotConns[plot] = plot.DescendantAdded:Connect(function()
         if scanQueued[plot] then return end
@@ -2040,19 +2172,19 @@ local function hookPlot(plot)
         task.delay(SCAN_DELAY, function()
             scanQueued[plot] = nil
             if plot and plot.Parent then
-                scanPlot(plot)
+                safeCall("scanPlot", scanPlot, plot)
             end
         end)
     end)
 end
 
 for _, plot in ipairs(plotsFolder:GetChildren()) do
-    hookPlot(plot)
+    safeCall("hookPlot", hookPlot, plot)
 end
 
 plotsFolder.ChildAdded:Connect(function(plot)
     task.delay(0.1, function()
-        hookPlot(plot)
+        safeCall("hookPlot", hookPlot, plot)
     end)
 end)
 
