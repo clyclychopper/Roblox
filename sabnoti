@@ -11,7 +11,7 @@ do
 
     -- Use shared fps cap method
     if setfpscap then
-        pcall(setfpscap, 20)
+        pcall(setfpscap, 15)
     end
 
     -- Fallback: busy-wait FPS limiter
@@ -96,9 +96,10 @@ local WEBHOOK_1 = getgenv().Webhook1 or error("❌ Webhook1 not set!")  -- 1m-50
 local WEBHOOK_2 = getgenv().Webhook2 or error("❌ Webhook2 not set!")  -- 50m-500m (no ping names)
 local WEBHOOK_3 = getgenv().Webhook3 or error("❌ Webhook3 not set!")  -- ping names + 500m+
 local WEBHOOK_4 = getgenv().Webhook4 or error("❌ Webhook4 not set!")  -- everything 10m+
+local WEBHOOK_ERROR = getgenv().WebhookError or error("❌ WebhookError not set!")  -- error logs
 
 -- Debug: Print credentials status
-print("[Config] ✅ All 4 webhooks configured")
+print("[Config] ✅ All 5 webhooks configured (4 main + 1 error log)")
 print("[Config] Player:", player.Name)
 print("[Config] Plots found:", #plotsFolder:GetChildren())
 local MIN_INCOME = 5000000  -- 5m minimum for webhook 1
@@ -106,12 +107,12 @@ local WEBHOOK_4_MIN = 10000000  -- 10m minimum for webhook 4
 local MID_THRESHOLD = 50000000  -- 50m
 local PING_THRESHOLD = 100000000  -- 100m threshold for ping names
 local HIGH_THRESHOLD = 500000000  -- 500m
-local SEND_DELAY = 1
+local SEND_DELAY = 2
 local SCAN_DELAY = 1.5
 
 local MAX_PLAYERS = 8
 local HOP_INTERVAL = 60  -- 1 minute
-local HIGH_VALUE_THRESHOLD = 300000000  -- 300m
+local HIGH_VALUE_THRESHOLD = 100000000  -- 100m
 
 -- Bot usernames to avoid (will hop if detected)
 local BOT_USERNAMES = {
@@ -1765,6 +1766,23 @@ function sendWebhookGrouped(entries)
                 print("[Webhook] Sent to", webhookName, "| Status:", res.StatusCode, "| Items:", #bucket)
             else
                 warn("[Webhook] Failed:", res)
+                -- Send error to error log webhook
+                pcall(function()
+                    req({
+                        Url = WEBHOOK_ERROR,
+                        Method = "POST",
+                        Headers = { ["Content-Type"] = "application/json" },
+                        Body = HttpService:JSONEncode({
+                            content = "⚠️ " .. player.Name,
+                            embeds = {{
+                                title = "Webhook Error: " .. webhookName,
+                                description = "```" .. tostring(res) .. "```\n\nServer: " .. game.JobId,
+                                color = 0xFF0000,
+                                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+                            }}
+                        })
+                    })
+                end)
             end
             
             if i < #embedBatches then task.wait(0.35) end
@@ -1780,6 +1798,7 @@ function sendWebhookGrouped(entries)
     buildAndSend(webhook3Entries, WEBHOOK_3, "WH3 (Ping+500m)", true)
     if #webhook3Entries > 0 then task.wait(0.5) end
     
+    print("[Webhook] WH4 has", #webhook4Entries, "items. Ping:", webhook4HasPingNames or webhook4Has300mPlus)
     buildAndSend(webhook4Entries, WEBHOOK_4, "WH4 (Main 10m+)", webhook4HasPingNames or webhook4Has300mPlus)
 end
 
