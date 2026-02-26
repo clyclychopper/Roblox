@@ -61,7 +61,14 @@ do
         Settings.Rendering.EditorQualityLevel = Enum.QualityLevel.Level01
     end)
 
-    print("[PERF] ✅ Performance optimizations applied: FPS=20, shadows off, quality reduced")
+    -- DISABLE 3D RENDERING COMPLETELY
+    pcall(function()
+        local ws = game:GetService("Workspace")
+        ws["3DRenderingEnabled"] = false -- Completely disable 3D rendering
+        print("[PERF] 3D Rendering: DISABLED")
+    end)
+
+    print("[PERF] ✅ Performance optimizations applied: FPS=20, shadows off, quality reduced, 3D rendering DISABLED")
 end
 
 --// SETTINGS
