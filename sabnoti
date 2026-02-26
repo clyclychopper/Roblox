@@ -1246,7 +1246,7 @@ local incomeByName = {
     ["Telemorte"] = 2000000,
     ["La Sahur Combinasion"] = 2000000,
     ["List List List Sahur"] = 2000000,
-    ["To To To Sahur"] = 2500000,
+    ["To To To Sahur"] = 2250000,
     ["Pirulitoita Bicicletaire"] = 2500000,
     ["25"] = 2500000,
     ["Santa Hotspot"] = 2600000,
@@ -1573,14 +1573,14 @@ local function computeIncome(baseIncome, mutation, traitString)
     -- Sort traits descending (highest first)
     table.sort(traitMults, function(a,b) return a > b end)
     
-    -- Apply diminishing returns to traits: first = full, rest = -1
-    local traitSum = traitMults[1]
+    -- Additive formula: mutation + trait1 + (trait2-1) + (trait3-1) - 1
+    local sum = mMult + traitMults[1]
     for i = 2, #traitMults do
-        traitSum = traitSum + (traitMults[i] - 1)
+        sum = sum + (traitMults[i] - 1)
     end
+    sum = sum - 1  -- Subtract 1 to avoid double-counting base
     
-    -- Mutation multiplies the trait sum
-    return math.floor(base * mMult * traitSum), displayTraits
+    return math.floor(base * sum), displayTraits
 end
 
 --// LOOKUP SET
