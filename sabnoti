@@ -218,6 +218,7 @@ local BOT_USERNAMES = {
 
 local currentHopTimer = nil
 local isHopping = false  -- Prevent multiple simultaneous hops
+local pendingHighValueHop = false  -- Flag to hop after webhook sends
 
 local PING_NAMES = {
     ["Rosetti Tualetti"] = true,
@@ -1885,7 +1886,8 @@ function queueWebhookSend(isHighValue)
         print("[DEBUG] Cancelled existing timer")
     end
     
-    local delay = isHighValue and 0.5 or SEND_DELAY
+    -- If high value, give time for ALL plots to finish scanning (3s > 1.5s SCAN_DELAY)
+    local delay = isHighValue and 3 or SEND_DELAY
     
     webhookTimer = task.delay(delay, function()
         webhookTimer = nil
@@ -1900,6 +1902,15 @@ function queueWebhookSend(isHighValue)
         
         table.clear(globalFound)
         table.clear(globalFoundKeys)  -- Clear hash set too
+        
+        -- NOW hop, only after webhook sent and all plots scanned
+        if pendingHighValueHop and not isHopping then
+            pendingHighValueHop = false
+            print("[HOP] 🚀 Webhook sent - now hopping!")
+            task.delay(0.5, function()  -- Brief buffer for HTTP to complete
+                serverHop("High Value Brainrot")
+            end)
+        end
     end)
     
     print("[DEBUG] Timer set for", delay, "seconds")
@@ -1972,7 +1983,7 @@ function serverHop(reason)
     -- Attempt server hop with fallback
     local success, errorMsg = pcall(function()
         local placeId = game.PlaceId
-        local servers = {}
+        local serverObjects = {}  -- Store full server objects, not just IDs
         
         print("[HOP] Fetching server list...")
         
@@ -1980,7 +1991,7 @@ function serverHop(reason)
         local listSuccess, _listError = pcall(function()
             local cursor = ""
             local attempts = 0
-            local maxAttempts = 2  -- Reduced from 3 for faster fallback
+            local maxAttempts = 2
             
             repeat
                 attempts += 1
@@ -1997,21 +2008,49 @@ function serverHop(reason)
                 if data and data.data then
                     for _, server in ipairs(data.data) do
                         if server.id ~= game.JobId and server.playing < server.maxPlayers then
-                            table.insert(servers, server.id)
+                            table.insert(serverObjects, {
+                                id = server.id,
+                                playing = server.playing,
+                                maxPlayers = server.maxPlayers
+                            })
                         end
                     end
                     cursor = data.nextPageCursor or ""
                 else
                     break
                 end
-            until cursor == "" or #servers >= 50  -- Stop early if we have enough servers
+            until cursor == "" or #serverObjects >= 50
         end)
         
-        if listSuccess and #servers > 0 then
-            local randomServer = servers[math.random(1, #servers)]
-            print(string.format("[HOP] Found %d servers. Teleporting to random server...", #servers))
-            TeleportService:TeleportToPlaceInstance(placeId, randomServer, player)
+        if listSuccess and #serverObjects > 0 then
+            -- Priority 1: High-population servers (5+ players, most active)
+            local highPopServers = {}
+            for _, server in ipairs(serverObjects) do
+                if server.playing >= 5 then
+                    table.insert(highPopServers, server)
+                end
+            end
+            
+            if #highPopServers > 0 then
+                -- Sort by highest population first (most active plots)
+                table.sort(highPopServers, function(a, b)
+                    return a.playing > b.playing
+                end)
+                
+                -- Pick randomly from top 5 high-pop servers
+                local pick = highPopServers[math.random(1, math.min(5, #highPopServers))]
+                print(string.format("[HOP] Found %d high-pop servers. Joining server with %d/%d players...", 
+                    #highPopServers, pick.playing, pick.maxPlayers))
+                TeleportService:TeleportToPlaceInstance(placeId, pick.id, player)
+            else
+                -- Priority 2: Any open server from the list
+                local pick = serverObjects[math.random(1, #serverObjects)]
+                print(string.format("[HOP] No high-pop servers. Joining server with %d/%d players...", 
+                    pick.playing, pick.maxPlayers))
+                TeleportService:TeleportToPlaceInstance(placeId, pick.id, player)
+            end
         else
+            -- Priority 3: Blind rejoin (last resort)
             warn("[HOP] Server list failed or empty, using simple rejoin...")
             TeleportService:Teleport(placeId, player)
         end
@@ -2132,22 +2171,20 @@ function scanPlot(plot)
             table.insert(globalFound, line)
         end
         
+        print(string.format("[Scanner] ✅ Found %d brainrots in %s", #foundList, plot.Name))
+        
+        -- Don't hop yet - just flag it. Webhook sender will hop after sending.
+        if shouldHopImmediate then
+            print("[HOP] 🚨 High value flagged - will hop AFTER all webhooks sent")
+            pendingHighValueHop = true  -- Set flag, don't hop now
+        end
+        
         -- Queue webhook with priority flag
         queueWebhookSend(shouldHopImmediate)
         
-        print(string.format("[Scanner] ✅ Found %d brainrots in %s", #foundList, plot.Name))
-        
-        -- Priority: High value > Server full (no race conditions)
-        if shouldHopImmediate then
-            print("[HOP] 🚀 High value detected - hopping after webhook...")
-            task.delay(2.5, function()
-                if not isHopping then
-                    serverHop("High Value Brainrot")
-                end
-            end)
-        elseif checkServerFull() and not isHopping then
-            print(string.format("[HOP] ⚠️ Server full (%d/%d players) - Hopping!", #Players:GetPlayers(), MAX_PLAYERS))
-            task.delay(1, function()
+        -- Server full check (lower priority, longer delay to let scans finish)
+        if not shouldHopImmediate and checkServerFull() and not isHopping then
+            task.delay(3, function()
                 if not isHopping then
                     serverHop("Server Full")
                 end
@@ -2162,13 +2199,30 @@ local function hookPlot(plot)
         plotConns[plot] = nil
     end
     
-    safeCall("scanPlot", scanPlot, plot)
+    -- Initial scan (parallel)
+    task.spawn(function()
+        safeCall("scanPlot", scanPlot, plot)
+    end)
     
-    plotConns[plot] = plot.DescendantAdded:Connect(function()
-        if scanQueued[plot] then return end
-        scanQueued[plot] = true
+    -- Fast DescendantAdded - only scan if it's actually a brainrot
+    plotConns[plot] = plot.DescendantAdded:Connect(function(newObj)
+        -- Quick filter: only care about Models
+        if not newObj:IsA("Model") then return end
         
-        task.delay(SCAN_DELAY, function()
+        local rawName = newObj.Name
+        if #rawName < 3 or #rawName > 60 then return end
+        
+        local cleanName = normalizeKey(normalizeBrainrotName(rawName))
+        if not brainrotSet[cleanName] then return end
+        
+        -- Cancel existing queued scan and restart timer
+        -- (don't skip - reset so we always catch the latest state)
+        if scanQueued[plot] then
+            task.cancel(scanQueued[plot])  -- Cancel the task handle
+        end
+        
+        -- Store task handle (not boolean) so we can cancel it
+        scanQueued[plot] = task.delay(0.2, function()
             scanQueued[plot] = nil
             if plot and plot.Parent then
                 safeCall("scanPlot", scanPlot, plot)
@@ -2177,8 +2231,11 @@ local function hookPlot(plot)
     end)
 end
 
+-- Parallel initial hookup of all plots
 for _, plot in ipairs(plotsFolder:GetChildren()) do
-    safeCall("hookPlot", hookPlot, plot)
+    task.spawn(function()
+        safeCall("hookPlot", hookPlot, plot)
+    end)
 end
 
 plotsFolder.ChildAdded:Connect(function(plot)
