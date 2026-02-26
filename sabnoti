@@ -106,7 +106,7 @@ local WEBHOOK_4_MIN = 10000000  -- 10m minimum for webhook 4
 local MID_THRESHOLD = 50000000  -- 50m
 local PING_THRESHOLD = 100000000  -- 100m threshold for ping names
 local HIGH_THRESHOLD = 500000000  -- 500m
-local SEND_DELAY = 3
+local SEND_DELAY = 1
 local SCAN_DELAY = 1.5
 
 local MAX_PLAYERS = 8
@@ -1564,22 +1564,22 @@ local function computeIncome(baseIncome, mutation, traitString)
         end
     end
     
-    if #traitMults == 0 then return math.floor(base * mMult), displayTraits end
-    
-    if mMult > 1 then
-        table.insert(traitMults, mMult)
-        table.sort(traitMults, function(a,b) return a > b end)
-        local sum = traitMults[1]
-        for i = 2, #traitMults do
-            local reduced = traitMults[i] - 1
-            if reduced > 0 then sum += reduced end
-        end
-        return math.floor(base * sum), displayTraits
-    else
-        local sum = 0
-        for _, mult in ipairs(traitMults) do sum += mult end
-        return math.floor(base * sum), displayTraits
+    -- No traits = just mutation
+    if #traitMults == 0 then 
+        return math.floor(base * mMult), displayTraits 
     end
+    
+    -- Sort traits descending (highest first)
+    table.sort(traitMults, function(a,b) return a > b end)
+    
+    -- Apply diminishing returns to traits: first = full, rest = -1
+    local traitSum = traitMults[1]
+    for i = 2, #traitMults do
+        traitSum = traitSum + (traitMults[i] - 1)
+    end
+    
+    -- Mutation multiplies the trait sum
+    return math.floor(base * mMult * traitSum), displayTraits
 end
 
 --// LOOKUP SET
@@ -1603,7 +1603,6 @@ for name,_ in pairs(PING_NAMES) do newPing[normalizeKey(name)] = true end
 PING_NAMES = newPing
 
 --// WEBHOOK ONLY MODE (Gist handled by Master Bot)
-local globalShouldPing = false
 
 -- Forward declarations
 local scanPlot
@@ -1797,7 +1796,6 @@ function queueWebhookSend()
         sendWebhookGrouped(globalFound)
         
         table.clear(globalFound)
-        globalShouldPing = false
     end)
 end
 
@@ -1958,19 +1956,30 @@ function scanPlot(plot)
                             ))
                         end
 
-                        if isPingName then
-                            globalShouldPing = true
-                        end
-
                         local label = ("**%s** | **%s** | 🧬 **%s** | 💰 **$%s** | 🌀 **%s**")
                             :format(displayName, rarity, mutationText, short(cost), traitText)
 
-                        table.insert(foundList, {
-                            rarity = rarity,
-                            income = finalIncome,
-                            line = label,
-                            isPingName = isPingName
-                        })
+                        -- Create unique key for global deduplication
+                        local globalKey = plot.Name .. "|" .. key
+                        
+                        -- Check if already in globalFound
+                        local alreadyQueued = false
+                        for _, existing in ipairs(globalFound) do
+                            if existing.globalKey == globalKey then
+                                alreadyQueued = true
+                                break
+                            end
+                        end
+                        
+                        if not alreadyQueued then
+                            table.insert(foundList, {
+                                rarity = rarity,
+                                income = finalIncome,
+                                line = label,
+                                isPingName = isPingName,
+                                globalKey = globalKey
+                            })
+                        end
                     end
                 end
             end
