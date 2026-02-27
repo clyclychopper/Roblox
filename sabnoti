@@ -1700,6 +1700,54 @@ local newPing = {}
 for name,_ in pairs(PING_NAMES) do newPing[normalizeKey(name)] = true end
 PING_NAMES = newPing
 
+--// FIREBASE COLLECTION FUNCTION
+-- Collects ALL brainrots in the server for Firebase (ignores deduplication)
+function getAllBrainrotsForFirebase()
+    local allBrainrots = {}
+    local seen = {}  -- Deduplicate within server
+    
+    for _, plot in ipairs(plotsFolder:GetChildren()) do
+        for _, obj in ipairs(plot:GetDescendants()) do
+            if obj:IsA("Model") then
+                local displayName = normalizeBrainrotName(obj.Name)
+                local cleanName = normalizeKey(displayName)
+                
+                if brainrotSet[cleanName] then
+                    local mutation, trait = getMutationAndTrait(obj)
+                    local key = cleanName .. "|" .. (mutation or "None") .. "|" .. (trait or "None")
+                    
+                    -- Deduplicate within server (not per-plot)
+                    if not seen[key] then
+                        seen[key] = true
+                        
+                        local rarity = rarityByName[cleanName] or "Unknown"
+                        local cost = costByName[cleanName] or 0
+                        local baseIncome = incomeByName[cleanName] or 0
+                        local finalIncome, traitList = computeIncome(baseIncome, mutation, trait)
+                        
+                        -- Only include if >= 80m (Firebase filter)
+                        if finalIncome >= 80000000 then
+                            local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
+                            local mutationText = mutation or "None"
+                            
+                            table.insert(allBrainrots, {
+                                name = displayName,
+                                rarity = rarity,
+                                mutation = mutationText,
+                                traits = traitText,
+                                income = finalIncome,
+                                cost = cost
+                            })
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return allBrainrots
+end
+
 --// WEBHOOK ONLY MODE (Gist handled by Master Bot)
 
 -- Forward declarations
@@ -1708,6 +1756,7 @@ local serverHop
 local checkServerFull
 local sendWebhookGrouped
 local queueWebhookSend
+local getAllBrainrotsForFirebase
 
 --// WEBHOOK FUNCTIONS
 local MAX_FIELDS_PER_EMBED = 25
@@ -1915,22 +1964,16 @@ function sendWebhookGrouped(entries)
     buildAndSend(webhook3Entries, WEBHOOK_3, "WH3 (800m+)", true)
     
     -- Upload to Firebase after all webhooks sent (80m+ only)
-    if FIREBASE_ENABLED and #entries > 0 then
-        -- Filter for 80m+ income only
-        local highValueEntries = {}
-        for _, entry in ipairs(entries) do
-            if (entry.income or 0) >= 80000000 then
-                table.insert(highValueEntries, entry)
-            end
-        end
-        
+    if FIREBASE_ENABLED then
         print("[Firebase] 🔄 Starting upload process...")
         print("[Firebase] DEBUG: FIREBASE_ENABLED =", FIREBASE_ENABLED)
-        print("[Firebase] DEBUG: Total entries =", #entries)
-        print("[Firebase] DEBUG: Filtered (80m+) =", #highValueEntries)
         
-        if #highValueEntries == 0 then
-            print("[Firebase] ⏸️ No entries >= 80m, skipping upload")
+        -- Collect ALL brainrots in server (not just new ones)
+        local allBrainrots = getAllBrainrotsForFirebase()
+        print("[Firebase] DEBUG: Total brainrots in server (80m+) =", #allBrainrots)
+        
+        if #allBrainrots == 0 then
+            print("[Firebase] ⏸️ No brainrots >= 80m in server, skipping upload")
             return
         end
         
@@ -1943,9 +1986,9 @@ function sendWebhookGrouped(entries)
             end
             print("[Firebase] ✅ Request function found:", tostring(req))
             
-            -- Build brainrots array (80m+ only)
+            -- Build brainrots array from ALL brainrots in server
             local brainrotsArray = {}
-            for i, entry in ipairs(highValueEntries) do
+            for i, entry in ipairs(allBrainrots) do
                 local brainrot = {
                     name = entry.name or "Unknown",
                     rarity = entry.rarity or "Unknown",
