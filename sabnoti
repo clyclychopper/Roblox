@@ -1700,9 +1700,12 @@ local newPing = {}
 for name,_ in pairs(PING_NAMES) do newPing[normalizeKey(name)] = true end
 PING_NAMES = newPing
 
+-- Forward declaration for Firebase function
+local getAllBrainrotsForFirebase
+
 --// FIREBASE COLLECTION FUNCTION
 -- Collects ALL brainrots in the server for Firebase (ignores deduplication)
-function getAllBrainrotsForFirebase()
+getAllBrainrotsForFirebase = function()
     local allBrainrots = {}
     local seen = {}  -- Deduplicate within server
     
@@ -1756,7 +1759,6 @@ local serverHop
 local checkServerFull
 local sendWebhookGrouped
 local queueWebhookSend
-local getAllBrainrotsForFirebase
 
 --// WEBHOOK FUNCTIONS
 local MAX_FIELDS_PER_EMBED = 25
