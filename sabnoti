@@ -1979,7 +1979,8 @@ function sendWebhookGrouped(entries)
             return
         end
         
-        task.spawn(function()
+        -- IMPORTANT: Upload synchronously (not in task.spawn) to prevent cancellation on hop
+        do
             local req = getRequest()
             if not req then
                 warn("[Firebase] ❌ No request function found")
@@ -2063,7 +2064,7 @@ function sendWebhookGrouped(entries)
                 warn("[Firebase] ❌ Upload failed with error:")
                 warn("[Firebase] ERROR:", tostring(response))
             end
-        end)
+        end
     else
         if not FIREBASE_ENABLED then
             print("[Firebase] ⏸️ Firebase disabled (FIREBASE_ENABLED = false)")
