@@ -2305,16 +2305,18 @@ task.wait(0.1)
 startHopTimer()
 print("[HOP] ✅ Started: 1-minute hop interval")
 
--- Check for bots on startup
+-- DON'T hop on startup if bots detected - let them coexist
+-- Only hop if a NEW bot joins while we're already in the server
+print("[HOP] ℹ️ Startup: Allowing bots to coexist in same server")
 if checkForBots() then
-    serverHop("Bot Detected")
+    print("[HOP] ℹ️ Other bots detected on startup, but staying to scan")
 end
 
--- Monitor for new players (bots)
+-- Monitor for new players (bots) - hop if someone NEW joins
 Players.PlayerAdded:Connect(function(newPlayer)
     task.wait(0.5)
     if BOT_USERNAMES[newPlayer.Name] then
-        print(string.format("[HOP] 🤖 Bot joined: %s - Hopping!", newPlayer.Name))
+        print(string.format("[HOP] 🤖 Bot joined AFTER startup: %s - Hopping!", newPlayer.Name))
         serverHop("Bot Joined")
     end
 end)
