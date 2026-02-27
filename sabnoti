@@ -1728,8 +1728,8 @@ getAllBrainrotsForFirebase = function()
                         local baseIncome = incomeByName[cleanName] or 0
                         local finalIncome, traitList = computeIncome(baseIncome, mutation, trait)
                         
-                        -- Only include if >= 80m (Firebase filter)
-                        if finalIncome >= 80000000 then
+                        -- Only include if >= 10m (Firebase filter)
+                        if finalIncome >= 10000000 then
                             local traitText = (#traitList > 0) and table.concat(traitList, ", ") or "None"
                             local mutationText = mutation or "None"
                             
@@ -1965,17 +1965,17 @@ function sendWebhookGrouped(entries)
     print("[Webhook] WH3 has", #webhook3Entries, "items (800m+). Always ping: true")
     buildAndSend(webhook3Entries, WEBHOOK_3, "WH3 (800m+)", true)
     
-    -- Upload to Firebase after all webhooks sent (80m+ only)
+    -- Upload to Firebase after all webhooks sent (10m+ only)
     if FIREBASE_ENABLED then
         print("[Firebase] 🔄 Starting upload process...")
         print("[Firebase] DEBUG: FIREBASE_ENABLED =", FIREBASE_ENABLED)
         
         -- Collect ALL brainrots in server (not just new ones)
         local allBrainrots = getAllBrainrotsForFirebase()
-        print("[Firebase] DEBUG: Total brainrots in server (80m+) =", #allBrainrots)
+        print("[Firebase] DEBUG: Total brainrots in server (10m+) =", #allBrainrots)
         
         if #allBrainrots == 0 then
-            print("[Firebase] ⏸️ No brainrots >= 80m in server, skipping upload")
+            print("[Firebase] ⏸️ No brainrots >= 10m in server, skipping upload")
             return
         end
         
