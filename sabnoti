@@ -1419,7 +1419,7 @@ local traits = {
     ["Strawberry"] = 8,
     ["Meowl"] = 7,
     ["Skibidi"] = 6.5,
-    [":3"] = 1.5,
+    [":3"] = 5.5,
 
     -- Seasonal Event Traits
     ["Reindeer"] = 6,
@@ -1458,6 +1458,7 @@ local traits = {
     ["Bubblegum"] = 4,
     ["UFO"] = 3,
     ["Taco"] = 3,
+    ["Chocolate"] = 5.5,
 
     -- Natural Event Traits
     ["Comet-struck"] = 3.5,
@@ -1478,35 +1479,60 @@ local traitAliases = {
 
     -- Seasonal
     ["SantaHatIcon"] = "Santa Hat",
+    ["SantaHat"] = "Santa Hat",
     ["Jack-o-Lantern Pet Trait"] = "Jack O' Lantern",
+    ["JackOLanternPetTrait"] = "Jack O' Lantern",
     ["GraveYard-RIP-Tombstone"] = "RIP Tombstone",
     ["Witchhat"] = "Witching Hour",
     ["Extincty"] = "Extinct",
+    ["ExtinctyExtinct"] = "Extinct",
     ["10b"] = "10B",
+    ["10b10B"] = "10B",
     ["2026Trait"] = "2026",
     ["2026Trait26"] = "2026",
 
     -- Ritual
     ["Chicleteirabicicleteira"] = "Paint",
+    ["ChicleteirabicicleteiraPaint"] = "Paint",
     ["MatteoHat"] = "Matteo Hat",
     ["Comet2"] = "Galactic",
+    ["Comet2Galactic"] = "Galactic",
     ["Bombardiro"] = "Explosive",
+    ["BombardiroExplosive"] = "Explosive",
+    ["SpiderSpider"] = "Spider",
+    ["TieTie"] = "Tie",
 
     -- Country
     ["Mexico Hat"] = "Sombrero",
+    ["MexicoHatSombrero"] = "Sombrero",
+    ["IndonesianIndonesian"] = "Indonesian",
+    ["BrazilBrazil"] = "Brazil",
 
     -- Admin-only / other common in-game wording
     ["Dragon"] = "Lightning",
     ["Lightning Dragon"] = "Lightning",
+    ["DragonLightning"] = "Lightning",
     ["Alienevent"] = "UFO",
     ["AlieneventUFO"] = "UFO",
     ["Glitch"] = "Glitched",
+    ["GlitchGlitched"] = "Glitched",
     ["Crab Claw"] = "CrabClaw",
     ["Claw"] = "CrabClaw",
-    ["Claws"] = "CrabClaw", -- your webhook shows this
+    ["Claws"] = "CrabClaw",
+    ["CrabClawCrab"] = "CrabClaw",
     ["EvilTungTungSahur"] = "Tung Tung Attack",
     ["Zombie"] = "Tung Tung Attack",
     ["Reindeer Pet"] = "Reindeer",
+    ["ReindeerReindeer"] = "Reindeer",
+    ["TacoTaco"] = "Taco",
+    ["BubblegumBubblegum"] = "Bubblegum",
+    ["DiscoRapConcert"] = "Disco",
+    ["FireworksFireworks"] = "Fireworks",
+    ["NyanNyan"] = "Nyan",
+    ["FireFire"] = "Fire",
+    ["RoseLance"] = "Rose",
+    ["ChocolateTrait"] = "Chocolate",
+    
     -- Natural
     ["Cometstruck"] = "Comet-struck",
     ["CometstruckComet-struck"] = "Comet-struck",
@@ -1622,34 +1648,32 @@ local function computeIncome(baseIncome, mutation, traitString)
     mutation = normalizeMutation(mutation)
     local mMult = mutationMultipliers[mutation] or 1
     local rawTraits = parseTraits(traitString)
-    local traitMults, displayTraits, seen = {}, {}, {}
+    local displayTraits, seen = {}, {}
+    
+    -- Collect all multipliers (mutation + traits) into one list
+    local allMultipliers = {mMult}
     
     for _, rawTrait in ipairs(rawTraits) do
         local tName = traitAliases[rawTrait] or rawTrait
         local tMult = traits[tName]
-        if tMult then table.insert(traitMults, tMult) end
+        if tMult then table.insert(allMultipliers, tMult) end
         if not seen[tName] then
             seen[tName] = true
             table.insert(displayTraits, tName)
         end
     end
     
-   -- No traits = just mutation
-    if #traitMults == 0 then 
-        return math.floor(base * mMult), displayTraits 
+    -- Sort all multipliers descending (highest first)
+    table.sort(allMultipliers, function(a,b) return a > b end)
+    
+    -- Stacking formula: First at full value, rest add (value - 1)
+    -- Example: Strawberry (8x) + Taco (3x) = 8 + (3-1) = 10x
+    local totalMultiplier = allMultipliers[1]
+    for i = 2, #allMultipliers do
+        totalMultiplier = totalMultiplier + (allMultipliers[i] - 1)
     end
     
-    -- Sort traits descending (highest first)
-    table.sort(traitMults, function(a,b) return a > b end)
-    
-    -- Additive trait stacking: trait1 + (trait2 - 1) + (trait3 - 1) + ...
-    -- Mutation is multiplicative ON TOP of trait stack
-    local traitSum = traitMults[1]
-    for i = 2, #traitMults do
-        traitSum = traitSum + (traitMults[i] - 1)
-    end
-    
-    return math.floor(base * traitSum * mMult), displayTraits
+    return math.floor(base * totalMultiplier), displayTraits
 end
 
 --// LOOKUP SET
