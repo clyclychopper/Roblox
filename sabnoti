@@ -1,3 +1,8 @@
+getgenv().Webhook1 = "https://discord.com/api/webhooks/1475066199342583848/tSwVV5wvoobDvA2cd0ZBJH3bELIEIxvFYswZ_mmVNLwzLgt9xo_k0fF-JT_P9dfw4GXz"
+getgenv().Webhook2 = "https://discord.com/api/webhooks/1476112161712508930/yKDKzkicxIVhwBKPB5mhh1tRVAYO-jBIIU8q7TLunR5hcrbF6h72_MNOKHEe1kOM8CJY"
+getgenv().Webhook3 = "https://discord.com/api/webhooks/1476621684738887691/osiLn7-MXSvZG9_8CL4f1yXw1M5KkdrObE21Ckz7hH10uWaH-e7Ar7Szv3f7OV0PlY6V"
+getgenv().WebhookError = "https://discord.com/api/webhooks/1476591290258034788/1KZe2pM7UbePnmrOCV-QfK6v-LsuB3Llh8w_W4PCfev6FuNm66_SzX5UjF2EX2MzorMmm"
+
 --// PERFORMANCE OPTIMIZATION BLOCK (inject at top, runs before everything)
 do
     -- FPS Cap at 20
@@ -1969,27 +1974,36 @@ function sendWebhookGrouped(entries)
     if FIREBASE_ENABLED then
         print("[Firebase] 🔄 Starting upload process...")
         print("[Firebase] DEBUG: FIREBASE_ENABLED =", FIREBASE_ENABLED)
+        print("[Firebase] DEBUG: Current time =", os.time())
+        print("[Firebase] DEBUG: Server JobId =", game.JobId)
         
         -- Collect ALL brainrots in server (not just new ones)
+        print("[Firebase] DEBUG: Calling getAllBrainrotsForFirebase()...")
         local allBrainrots = getAllBrainrotsForFirebase()
         print("[Firebase] DEBUG: Total brainrots in server (10m+) =", #allBrainrots)
         
         if #allBrainrots == 0 then
             print("[Firebase] ⏸️ No brainrots >= 10m in server, skipping upload")
+            print("[Firebase] DEBUG: Exiting Firebase upload (no data)")
             return
         end
         
+        print("[Firebase] DEBUG: Proceeding with upload of", #allBrainrots, "brainrots")
+        
         -- IMPORTANT: Upload synchronously (not in task.spawn) to prevent cancellation on hop
         do
+            print("[Firebase] DEBUG: Getting request function...")
             local req = getRequest()
             if not req then
                 warn("[Firebase] ❌ No request function found")
                 warn("[Firebase] DEBUG: Available functions - syn:", syn ~= nil, "http:", http ~= nil, "http_request:", http_request ~= nil, "request:", request ~= nil)
+                print("[Firebase] DEBUG: Exiting Firebase upload (no request function)")
                 return
             end
             print("[Firebase] ✅ Request function found:", tostring(req))
             
             -- Build brainrots array from ALL brainrots in server
+            print("[Firebase] DEBUG: Building brainrots array...")
             local brainrotsArray = {}
             for i, entry in ipairs(allBrainrots) do
                 local brainrot = {
@@ -2016,8 +2030,10 @@ function sendWebhookGrouped(entries)
                 end
             end
             print("[Firebase] 📦 Built array with", #brainrotsArray, "brainrots")
+            print("[Firebase] DEBUG: Array building complete")
             
             -- Build Firebase payload
+            print("[Firebase] DEBUG: Building Firebase payload...")
             local payload = {
                 jobId = game.JobId,
                 placeId = game.PlaceId,
@@ -2031,16 +2047,23 @@ function sendWebhookGrouped(entries)
             print("  - timestamp:", payload.timestamp)
             print("  - playerCount:", payload.playerCount)
             print("  - brainrots count:", #payload.brainrots)
+            print("[Firebase] DEBUG: Payload building complete")
             
             -- Upload to Firebase
+            print("[Firebase] DEBUG: Constructing Firebase URL...")
             local firebaseUrl = FIREBASE_URL .. "/" .. game.JobId .. ".json"
             print("[Firebase] 🌐 Target URL:", firebaseUrl)
+            print("[Firebase] DEBUG: Base URL:", FIREBASE_URL)
+            print("[Firebase] DEBUG: JobId:", game.JobId)
             
+            print("[Firebase] DEBUG: Encoding payload to JSON...")
             local jsonBody = HttpService:JSONEncode(payload)
             print("[Firebase] 📝 JSON body length:", #jsonBody, "characters")
             print("[Firebase] 📝 JSON preview:", jsonBody:sub(1, 200) .. "...")
+            print("[Firebase] DEBUG: JSON encoding complete")
             
             print("[Firebase] 🚀 Sending PUT request...")
+            print("[Firebase] DEBUG: Calling request function...")
             local success, response = pcall(function()
                 return req({
                     Url = firebaseUrl,
@@ -2050,20 +2073,28 @@ function sendWebhookGrouped(entries)
                 })
             end)
             
+            print("[Firebase] DEBUG: Request completed, processing response...")
+            
             if success then
+                print("[Firebase] DEBUG: pcall succeeded")
                 if response and response.StatusCode then
                     print("[Firebase] ✅ Upload successful!")
                     print("[Firebase] 📊 Status Code:", response.StatusCode)
                     print("[Firebase] 📊 Response Body:", response.Body and response.Body:sub(1, 200) or "(empty)")
                     print(string.format("[Firebase] ✅ Uploaded %d brainrots to Firebase", #brainrotsArray))
+                    print("[Firebase] DEBUG: Upload process complete")
                 else
                     warn("[Firebase] ⚠️ Request succeeded but response is invalid")
                     warn("[Firebase] DEBUG: response =", response)
+                    warn("[Firebase] DEBUG: response type:", type(response))
                 end
             else
                 warn("[Firebase] ❌ Upload failed with error:")
                 warn("[Firebase] ERROR:", tostring(response))
+                warn("[Firebase] DEBUG: pcall failed")
             end
+            
+            print("[Firebase] DEBUG: Firebase upload section complete")
         end
     else
         if not FIREBASE_ENABLED then
