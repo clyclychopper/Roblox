@@ -138,6 +138,10 @@ WEBHOOK_2 = validateWebhook(WEBHOOK_2, "Webhook2")
 WEBHOOK_3 = validateWebhook(WEBHOOK_3, "Webhook3")
 WEBHOOK_ERROR = validateWebhook(WEBHOOK_ERROR, "WebhookError")
 
+-- Firebase configuration
+local FIREBASE_URL = "https://clynotify-default-rtdb.asia-southeast1.firebasedatabase.app"
+local FIREBASE_ENABLED = true
+
 -- Debug: Print webhook info (first 50 chars only for security)
 print("[Config] ✅ All 4 webhooks configured (3 main + 1 error log)")
 print("[Config] WH1 starts with:", WEBHOOK_1:sub(1, 50))
@@ -1909,6 +1913,119 @@ function sendWebhookGrouped(entries)
     -- Webhook 3: 800m+ only, always ping
     print("[Webhook] WH3 has", #webhook3Entries, "items (800m+). Always ping: true")
     buildAndSend(webhook3Entries, WEBHOOK_3, "WH3 (800m+)", true)
+    
+    -- Upload to Firebase after all webhooks sent (80m+ only)
+    if FIREBASE_ENABLED and #entries > 0 then
+        -- Filter for 80m+ income only
+        local highValueEntries = {}
+        for _, entry in ipairs(entries) do
+            if (entry.income or 0) >= 80000000 then
+                table.insert(highValueEntries, entry)
+            end
+        end
+        
+        print("[Firebase] 🔄 Starting upload process...")
+        print("[Firebase] DEBUG: FIREBASE_ENABLED =", FIREBASE_ENABLED)
+        print("[Firebase] DEBUG: Total entries =", #entries)
+        print("[Firebase] DEBUG: Filtered (80m+) =", #highValueEntries)
+        
+        if #highValueEntries == 0 then
+            print("[Firebase] ⏸️ No entries >= 80m, skipping upload")
+            return
+        end
+        
+        task.spawn(function()
+            local req = getRequest()
+            if not req then
+                warn("[Firebase] ❌ No request function found")
+                warn("[Firebase] DEBUG: Available functions - syn:", syn ~= nil, "http:", http ~= nil, "http_request:", http_request ~= nil, "request:", request ~= nil)
+                return
+            end
+            print("[Firebase] ✅ Request function found:", tostring(req))
+            
+            -- Build brainrots array (80m+ only)
+            local brainrotsArray = {}
+            for i, entry in ipairs(highValueEntries) do
+                local brainrot = {
+                    name = entry.name or "Unknown",
+                    rarity = entry.rarity or "Unknown",
+                    mutation = entry.mutation or "None",
+                    traits = entry.traits or "None",
+                    income = entry.income or 0,
+                    cost = entry.cost or 0,
+                    serverId = game.JobId,
+                    foundAt = os.time(),
+                    playerCount = #Players:GetPlayers()
+                }
+                table.insert(brainrotsArray, brainrot)
+                
+                -- Debug first entry
+                if i == 1 then
+                    print("[Firebase] DEBUG: First brainrot data:")
+                    print("  - Name:", brainrot.name)
+                    print("  - Rarity:", brainrot.rarity)
+                    print("  - Income:", brainrot.income)
+                    print("  - Mutation:", brainrot.mutation)
+                    print("  - Traits:", brainrot.traits)
+                end
+            end
+            print("[Firebase] 📦 Built array with", #brainrotsArray, "brainrots")
+            
+            -- Build Firebase payload
+            local payload = {
+                jobId = game.JobId,
+                placeId = game.PlaceId,
+                timestamp = os.time(),
+                playerCount = #Players:GetPlayers(),
+                brainrots = brainrotsArray
+            }
+            print("[Firebase] 📋 Payload structure:")
+            print("  - jobId:", payload.jobId)
+            print("  - placeId:", payload.placeId)
+            print("  - timestamp:", payload.timestamp)
+            print("  - playerCount:", payload.playerCount)
+            print("  - brainrots count:", #payload.brainrots)
+            
+            -- Upload to Firebase
+            local firebaseUrl = FIREBASE_URL .. "/" .. game.JobId .. ".json"
+            print("[Firebase] 🌐 Target URL:", firebaseUrl)
+            
+            local jsonBody = HttpService:JSONEncode(payload)
+            print("[Firebase] 📝 JSON body length:", #jsonBody, "characters")
+            print("[Firebase] 📝 JSON preview:", jsonBody:sub(1, 200) .. "...")
+            
+            print("[Firebase] 🚀 Sending PUT request...")
+            local success, response = pcall(function()
+                return req({
+                    Url = firebaseUrl,
+                    Method = "PUT",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = jsonBody
+                })
+            end)
+            
+            if success then
+                if response and response.StatusCode then
+                    print("[Firebase] ✅ Upload successful!")
+                    print("[Firebase] 📊 Status Code:", response.StatusCode)
+                    print("[Firebase] 📊 Response Body:", response.Body and response.Body:sub(1, 200) or "(empty)")
+                    print(string.format("[Firebase] ✅ Uploaded %d brainrots to Firebase", #brainrotsArray))
+                else
+                    warn("[Firebase] ⚠️ Request succeeded but response is invalid")
+                    warn("[Firebase] DEBUG: response =", response)
+                end
+            else
+                warn("[Firebase] ❌ Upload failed with error:")
+                warn("[Firebase] ERROR:", tostring(response))
+            end
+        end)
+    else
+        if not FIREBASE_ENABLED then
+            print("[Firebase] ⏸️ Firebase disabled (FIREBASE_ENABLED = false)")
+        elseif #entries == 0 then
+            print("[Firebase] ⏸️ No entries to upload")
+        end
+    end
 end
 
 function queueWebhookSend(isHighValue)
@@ -2187,8 +2304,12 @@ function scanPlot(plot)
                         if not globalFoundKeys[globalKey] then
                             globalFoundKeys[globalKey] = true  -- Mark as seen
                             table.insert(foundList, {
+                                name = displayName,
                                 rarity = rarity,
+                                mutation = mutationText,
+                                traits = traitText,
                                 income = finalIncome,
+                                cost = cost,
                                 line = label,
                                 isPingName = isPingName,
                                 globalKey = globalKey
