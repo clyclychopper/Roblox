@@ -10,27 +10,8 @@ do
     end)
 
     -- Use shared fps cap method - 20 FPS for reliable event processing
-    local fpsCapEnabled = not setfpscap
     if setfpscap then
-        local success = pcall(setfpscap, 20)
-        if not success then
-            fpsCapEnabled = true  -- Fallback if setfpscap fails
-        end
-    end
-
-    -- Fallback: busy-wait FPS limiter
-    if fpsCapEnabled then
-        local TARGET_FPS = 20
-        local FRAME_TIME = 1 / TARGET_FPS
-        local lastFrame = tick()
-        RunService.RenderStepped:Connect(function()
-            local now = tick()
-            local delta = now - lastFrame
-            if delta < FRAME_TIME then
-                -- spin-wait not needed; Roblox handles frame timing
-            end
-            lastFrame = now
-        end)
+        pcall(setfpscap, 20)
     end
 
     -- Reduce rendering quality aggressively
@@ -139,31 +120,43 @@ local function validateWebhook(url, name)
     return url
 end
 
+-- Clean and validate webhooks
+local function cleanWebhook(url)
+    -- Remove any whitespace, newlines, or invisible characters
+    url = url:gsub("%s+", "")
+    url = url:gsub("[\r\n]", "")
+    return url
+end
+
+WEBHOOK_1 = cleanWebhook(WEBHOOK_1)
+WEBHOOK_2 = cleanWebhook(WEBHOOK_2)
+WEBHOOK_3 = cleanWebhook(WEBHOOK_3)
+WEBHOOK_ERROR = cleanWebhook(WEBHOOK_ERROR)
+
 WEBHOOK_1 = validateWebhook(WEBHOOK_1, "Webhook1")
 WEBHOOK_2 = validateWebhook(WEBHOOK_2, "Webhook2")
 WEBHOOK_3 = validateWebhook(WEBHOOK_3, "Webhook3")
 WEBHOOK_ERROR = validateWebhook(WEBHOOK_ERROR, "WebhookError")
 
--- Debug: Print credentials status
+-- Debug: Print webhook info (first 50 chars only for security)
 print("[Config] ✅ All 4 webhooks configured (3 main + 1 error log)")
+print("[Config] WH1 starts with:", WEBHOOK_1:sub(1, 50))
+print("[Config] WH1 length:", #WEBHOOK_1, "chars")
 print("[Config] Player:", player.Name)
 print("[Config] Plots found:", #plotsFolder:GetChildren())
-local MIN_INCOME = 10000000  -- 10m minimum
-local MID_THRESHOLD = 50000000  -- 50m
-local HIGH_THRESHOLD = 500000000  -- 500m
-local BILLION_THRESHOLD = 1000000000  -- 1b
+local MIN_INCOME = 10000000      -- 10m minimum
+local MID_THRESHOLD = 50000000   -- 50m (WH2 starts here)
+local HIGH_THRESHOLD = 200000000 -- 200m (auto-ping threshold)
+local BILLION_THRESHOLD = 800000000  -- 800m (WH3 threshold)
 local SEND_DELAY = 2
-local SCAN_DELAY = 1.5
+local HIGH_VALUE_THRESHOLD = 100000000  -- 100m (hop trigger)
 
 local MAX_PLAYERS = 8
 local HOP_INTERVAL = 60  -- 1 minute
-local HIGH_VALUE_THRESHOLD = 100000000  -- 100m
+
 
 -- Bot usernames to avoid (will hop if detected)
 local BOT_USERNAMES = {
-    ["crimsshadowclubPlays"] = true,
-    ["Ultrazwiftdino"] = true,
-    ["Lucazgangkai"] = true,
     ["Nor4crewHQgames11"] = true,
     ["LadyLucasrbxDev"] = true,
     ["miniRileyliamProJax"] = true,
@@ -264,7 +257,8 @@ local PING_NAMES = {
     ["Eviledon"] = true,
     ["Cooki and Milki"] = true,
     ["Capitano Moby"] = true,
-    ["Headless Horseman"] = true
+    ["Headless Horseman"] = true,
+    ["Noo my Heart"] = true
 
 }
 
@@ -439,7 +433,7 @@ local brainrots = {
 "Bunito Bunito Spinito",
 "Noo My Candy",
 "Los Nooo My Hotspotsitos",
-"La Grande Combinassion",
+"La Grande Combinasion",
 "Rang Ring Bus",
 "Guest 666",
 "Los Mi Gatitos",
@@ -719,7 +713,7 @@ local rarityByName = {
     ["Bunito Bunito Spinito"] = "Secret",
     ["Noo My Candy"] = "Secret",
     ["Los Nooo My Hotspotsitos"] = "Secret",
-    ["La Grande Combinassion"] = "Secret",
+    ["La Grande Combinasion"] = "Secret",
     ["Rang Ring Bus"] = "Secret",
     ["Guest 666"] = "Secret",
     ["Los Mi Gatitos"] = "Secret",
@@ -1019,7 +1013,7 @@ local costByName = {
     ["Noo My Candy"] = 900000000,
 
     ["Los Nooo My Hotspotsitos"] = 1000000000,
-    ["La Grande Combinassion"] = 1000000000,
+    ["La Grande Combinasion"] = 1000000000,
 
     ["Rang Ring Bus"] = 1100000000,
     ["Guest 666"] = 1100000000,
@@ -1319,7 +1313,7 @@ local incomeByName = {
     ["Bunito Bunito Spinito"] = 3000000,
     ["Noo My Candy"] = 5000000,
     ["Los Nooo My Hotspotsitos"] = 5000000,
-    ["La Grande Combinassion"] = 10000000,
+    ["La Grande Combinasion"] = 10000000,
     ["Rang Ring Bus"] = 6000000,
     ["Guest 666"] = 6600000,
     ["Los Mi Gatitos"] = 6500000,
@@ -1546,8 +1540,9 @@ local function short(n)
 end
 
 local function normalizeMutation(m)
-    m = tostring(m or "Default"):gsub("%s+", "")
-    local map = {default="Default", gold="Gold", diamond="Diamond", bloodrot="Bloodrot", candy="Candy", lava="Lava", galaxy="Galaxy", yinyang="YinYang", radioactive="Radioactive", cursed="Cursed", divine="Divine", rainbow="Rainbow"}
+    if not m or m == "" then return "None" end
+    m = tostring(m):gsub("%s+", "")
+    local map = {none="None", default="None", gold="Gold", diamond="Diamond", bloodrot="Bloodrot", candy="Candy", lava="Lava", galaxy="Galaxy", yinyang="YinYang", radioactive="Radioactive", cursed="Cursed", divine="Divine", rainbow="Rainbow"}
     return map[m:lower()] or m
 end
 
@@ -1573,28 +1568,53 @@ local function parseTraits(traitString)
     return result
 end
 
-local function getMutation(obj)
-    if not obj then return nil end
-    local attr = obj:GetAttribute("Mutation")
-    if attr then return tostring(attr) end
-    local v = obj:FindFirstChild("Mutation")
-    if v and v:IsA("ValueBase") then return tostring(v.Value) end
-    for _, d in ipairs(obj:GetDescendants()) do
-        if d.Name == "Mutation" and d:IsA("ValueBase") then return tostring(d.Value) end
+-- Combined function to get both mutation and trait in one pass (avoids duplicate GetDescendants)
+local function getMutationAndTrait(obj)
+    if not obj then return nil, nil end
+    
+    -- Check attributes first (fastest)
+    local mutation = obj:GetAttribute("Mutation")
+    local trait = obj:GetAttribute("Traits")
+    if mutation and trait then
+        return tostring(mutation), tostring(trait)
     end
-    return obj.Name:match("%[(.-)%]") or obj.Name:match("%((.-)%)")
-end
-
-local function getTrait(obj)
-    if not obj then return nil end
-    local attr = obj:GetAttribute("Traits")
-    if attr then return tostring(attr) end
-    local v = obj:FindFirstChild("Traits")
-    if v and v:IsA("ValueBase") then return tostring(v.Value) end
-    for _, d in ipairs(obj:GetDescendants()) do
-        if d.Name == "Traits" and d:IsA("ValueBase") then return tostring(d.Value) end
+    
+    -- Check direct children
+    if not mutation then
+        local mutationChild = obj:FindFirstChild("Mutation")
+        if mutationChild and mutationChild:IsA("ValueBase") then
+            mutation = tostring(mutationChild.Value)
+        end
     end
-    return nil
+    if not trait then
+        local traitChild = obj:FindFirstChild("Traits")
+        if traitChild and traitChild:IsA("ValueBase") then
+            trait = tostring(traitChild.Value)
+        end
+    end
+    if mutation and trait then
+        return mutation, trait
+    end
+    
+    -- Single GetDescendants pass for both values (major performance gain)
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA("ValueBase") then
+            if d.Name == "Mutation" and not mutation then
+                mutation = tostring(d.Value)
+            end
+            if d.Name == "Traits" and not trait then
+                trait = tostring(d.Value)
+            end
+            if mutation and trait then break end  -- Early exit
+        end
+    end
+    
+    -- Fallback: parse mutation from name
+    if not mutation then
+        mutation = obj.Name:match("%[(.-)%]") or obj.Name:match("%((.-)%)")
+    end
+    
+    return mutation, trait
 end
 
 local function computeIncome(baseIncome, mutation, traitString)
@@ -1614,7 +1634,7 @@ local function computeIncome(baseIncome, mutation, traitString)
         end
     end
     
-    -- No traits = just mutation
+   -- No traits = just mutation
     if #traitMults == 0 then 
         return math.floor(base * mMult), displayTraits 
     end
@@ -1622,14 +1642,14 @@ local function computeIncome(baseIncome, mutation, traitString)
     -- Sort traits descending (highest first)
     table.sort(traitMults, function(a,b) return a > b end)
     
-    -- Additive formula: mutation + trait1 + (trait2-1) + (trait3-1) - 1
-    local sum = mMult + traitMults[1]
+    -- Additive trait stacking: trait1 + (trait2 - 1) + (trait3 - 1) + ...
+    -- Mutation is multiplicative ON TOP of trait stack
+    local traitSum = traitMults[1]
     for i = 2, #traitMults do
-        sum = sum + (traitMults[i] - 1)
+        traitSum = traitSum + (traitMults[i] - 1)
     end
-    sum = sum - 1  -- Subtract 1 to avoid double-counting base
     
-    return math.floor(base * sum), displayTraits
+    return math.floor(base * traitSum * mMult), displayTraits
 end
 
 --// LOOKUP SET
@@ -1707,26 +1727,12 @@ function sendWebhookGrouped(entries)
     end
     print("[DEBUG] Request function found:", req)
     
-    -- DEDUPLICATE ENTRIES
-    local seen = {}
-    local dedupedEntries = {}
-    for _, e in ipairs(entries) do
-        local key = e.line -- Use the full line as unique key
-        if not seen[key] then
-            seen[key] = true
-            table.insert(dedupedEntries, e)
-        end
-    end
-    
-    if #dedupedEntries == 0 then 
-        print("[DEBUG] All entries were duplicates")
-        return 
-    end
-    print("[Webhook] Deduped:", #entries, "->", #dedupedEntries)
+    -- No deduplication needed - globalFoundKeys already handles this in scanPlot
+    print("[Webhook] Processing", #entries, "entries (pre-deduplicated)")
     
     -- Debug: Print first entry
-    if #dedupedEntries > 0 then
-        local first = dedupedEntries[1]
+    if #entries > 0 then
+        local first = entries[1]
         print("[DEBUG] First entry - Income:", first.income, "IsPing:", first.isPingName, "Line:", first.line:sub(1, 50))
     end
     
@@ -1734,21 +1740,21 @@ function sendWebhookGrouped(entries)
     local webhook2Entries = {}
     local webhook3Entries = {}
     
-    for _, e in ipairs(dedupedEntries) do
+    for _, e in ipairs(entries) do
         local income = e.income or 0
         local isPingName = e.isPingName or false
-        
-        -- Webhook 1: 10m-50m only (no ping names)
+
+        -- Webhook 1: 10m-49.99m only, never ping names
         if income >= MIN_INCOME and income < MID_THRESHOLD and not isPingName then
             table.insert(webhook1Entries, e)
         end
-        
-        -- Webhook 2: 50m+ OR ping names (ping if 500m+ or ping names)
+
+        -- Webhook 2: 50m+ (all of them, no upper cap)
         if income >= MID_THRESHOLD or isPingName then
             table.insert(webhook2Entries, e)
         end
-        
-        -- Webhook 3: 1b+ only (always ping)
+
+        -- Webhook 3: 800m+ income only (always @everyone)
         if income >= BILLION_THRESHOLD then
             table.insert(webhook3Entries, e)
         end
@@ -1803,7 +1809,7 @@ function sendWebhookGrouped(entries)
                     description = "",
                     color = RARITY_COLOR[rarity] or RARITY_COLOR["Unknown"],
                     thumbnail = {url = "https://static.wikia.nocookie.net/stealabr/images/e/e3/Tung_Tung_Tung_Sahur.png/revision/latest?cb=20260125163843"},
-                    footer = {text = player.Name .. " | " .. tostring(playerCount) .. "/8👤"},
+                    footer = {text = "Cly Notify" .. " | " .. tostring(playerCount) .. "/8👤"},
                     fields = fchunk,
                     timestamp = timestamp
                 })
@@ -1864,10 +1870,10 @@ function sendWebhookGrouped(entries)
         task.wait(0.5)
     end
     
-    -- Webhook 2: 50m+ (ping if 500m+ or ping names)
+    -- Webhook 2: ping if (isPingName AND income >= 80m) OR income >= 200m
     local shouldPingWH2 = false
     for _, e in ipairs(webhook2Entries) do
-        if e.income >= HIGH_THRESHOLD or e.isPingName then
+        if (e.isPingName and e.income >= 80000000) or e.income >= HIGH_THRESHOLD then
             shouldPingWH2 = true
             break
         end
@@ -1875,21 +1881,22 @@ function sendWebhookGrouped(entries)
     print("[Webhook] WH2 has", #webhook2Entries, "items. Ping:", shouldPingWH2)
     buildAndSend(webhook2Entries, WEBHOOK_2, "WH2 (50m+)", shouldPingWH2)
     if #webhook2Entries > 0 then task.wait(0.5) end
-    
-    -- Webhook 3: 1b+ only (always ping)
-    print("[Webhook] WH3 has", #webhook3Entries, "items (1b+). Always ping: true")
-    buildAndSend(webhook3Entries, WEBHOOK_3, "WH3 (1b+)", true)
+
+    -- Webhook 3: 800m+ only, always ping
+    print("[Webhook] WH3 has", #webhook3Entries, "items (800m+). Always ping: true")
+    buildAndSend(webhook3Entries, WEBHOOK_3, "WH3 (800m+)", true)
 end
 
 function queueWebhookSend(isHighValue)
     print("[DEBUG] queueWebhookSend called, globalFound:", #globalFound, "highValue:", isHighValue or false)
     
     if webhookTimer then
-        task.cancel(webhookTimer)
-        print("[DEBUG] Cancelled existing timer")
+    pcall(task.cancel, webhookTimer)  -- add pcall
+    webhookTimer = nil
+    print("[DEBUG] Cancelled existing timer")
     end
     
-    -- If high value, give time for ALL plots to finish scanning (3s > 1.5s SCAN_DELAY)
+    -- If high value, give time for ALL plots to finish scanning (3s > 0.2s debounce)
     local delay = isHighValue and 3 or SEND_DELAY
     
     webhookTimer = task.delay(delay, function()
@@ -1948,15 +1955,15 @@ function serverHop(reason)
     
     print(string.format("\n🔄 [HOP] Initiating server hop... Reason: %s", reason or "Timer"))
     
-    -- Cancel hop timer
+    -- Cancel hop timer (safely handle if it's already running)
     if currentHopTimer then
-        task.cancel(currentHopTimer)
-        currentHopTimer = nil
+    pcall(task.cancel, currentHopTimer)  -- pcall directly on task.cancel, not wrapped
+    currentHopTimer = nil
     end
-    
+        
     -- Cancel any pending webhook timer and send immediately
     if webhookTimer then
-        task.cancel(webhookTimer)
+    pcall(task.cancel, webhookTimer)
         webhookTimer = nil
         print("[HOP] Cancelled pending webhook timer")
         
@@ -1991,7 +1998,7 @@ function serverHop(reason)
         print("[HOP] Fetching server list...")
         
         -- Try to get server list with timeout
-        local listSuccess, _listError = pcall(function()
+        local listSuccess = pcall(function()
             local cursor = ""
             local attempts = 0
             local maxAttempts = 2
@@ -2029,7 +2036,7 @@ function serverHop(reason)
             -- Priority 1: High-population servers (5+ players, most active)
             local highPopServers = {}
             for _, server in ipairs(serverObjects) do
-                if server.playing >= 5 then
+                if server.playing >= 4 then
                     table.insert(highPopServers, server)
                 end
             end
@@ -2076,9 +2083,10 @@ end
 -- Start 1-minute hop timer
 local function startHopTimer()
     if currentHopTimer then
-        task.cancel(currentHopTimer)
+        pcall(task.cancel, currentHopTimer)  -- use pcall here too
     end
     currentHopTimer = task.delay(HOP_INTERVAL, function()
+        currentHopTimer = nil
         print("[HOP] ⏰ 1-minute timer expired")
         serverHop("Timer")
     end)
@@ -2116,8 +2124,7 @@ function scanPlot(plot)
             local cleanName = normalizeKey(displayName)
 
             if brainrotSet[cleanName] then
-                local mutation = getMutation(obj)
-                local trait = getTrait(obj)
+                local mutation, trait = getMutationAndTrait(obj)
 
                 local key = cleanName .. "|" .. (mutation or "None") .. "|" .. (trait or "None")
                 if not reported[plot][key] then
@@ -2219,9 +2226,10 @@ local function hookPlot(plot)
         if not brainrotSet[cleanName] then return end
         
         -- Cancel existing queued scan and restart timer
-        -- (don't skip - reset so we always catch the latest state)
+       -- In hookPlot's DescendantAdded:
         if scanQueued[plot] then
-            task.cancel(scanQueued[plot])  -- Cancel the task handle
+        pcall(task.cancel, scanQueued[plot])  -- add pcall
+        scanQueued[plot] = nil
         end
         
         -- Store task handle (not boolean) so we can cancel it
@@ -2258,4 +2266,4 @@ end)
 
 print("[Scanner] ✅ Initialized!")
 print("[HOP] 📋 Rules: 1min timer | Immediate on high value | Immediate on server full | Immediate on bot detection")
-print("[Webhook] 📋 Distribution: WH1=10m-50m | WH2=50m+ (@everyone if 500m+/ping) | WH3=1b+ (always @everyone)")
+print("[Webhook] 📋 Distribution: WH1=10m-50m (no ping) | WH2=50m+ (ping if pingname≥80m or ≥200m) | WH3=800m+ (always @everyone)")
