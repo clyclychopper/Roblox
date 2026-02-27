@@ -2328,8 +2328,10 @@ function scanPlot(plot)
 
     local foundList = {}
     local shouldHopImmediate = false
-
-    for _, obj in ipairs(plot:GetDescendants()) do
+    local descendants = plot:GetDescendants()
+    
+    for i, obj in ipairs(descendants) do
+        if i % 50 == 0 then task.wait() end  -- Yield every 50 objects
         if obj:IsA("Model") then
             local displayName = normalizeBrainrotName(obj.Name)
             local cleanName = normalizeKey(displayName)
@@ -2457,11 +2459,12 @@ local function hookPlot(plot)
     end)
 end
 
--- Parallel initial hookup of all plots
-for _, plot in ipairs(plotsFolder:GetChildren()) do
+-- Parallel initial hookup of all plots with yielding
+for i, plot in ipairs(plotsFolder:GetChildren()) do
     task.spawn(function()
         safeCall("hookPlot", hookPlot, plot)
     end)
+    if i % 2 == 0 then task.wait() end  -- Yield every 2 plots
 end
 
 plotsFolder.ChildAdded:Connect(function(plot)
