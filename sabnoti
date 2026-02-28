@@ -2242,32 +2242,11 @@ function serverHop(reason)
         end)
         
         if listSuccess and #serverObjects > 0 then
-            -- Priority 1: High-population servers (5+ players, most active)
-            local highPopServers = {}
-            for _, server in ipairs(serverObjects) do
-                if server.playing >= 4 then
-                    table.insert(highPopServers, server)
-                end
-            end
-            
-            if #highPopServers > 0 then
-                -- Sort by highest population first (most active plots)
-                table.sort(highPopServers, function(a, b)
-                    return a.playing > b.playing
-                end)
-                
-                -- Pick randomly from top 5 high-pop servers
-                local pick = highPopServers[math.random(1, math.min(5, #highPopServers))]
-                print(string.format("[HOP] Found %d high-pop servers. Joining server with %d/%d players...", 
-                    #highPopServers, pick.playing, pick.maxPlayers))
-                TeleportService:TeleportToPlaceInstance(placeId, pick.id, player)
-            else
-                -- Priority 2: Any open server from the list
-                local pick = serverObjects[math.random(1, #serverObjects)]
-                print(string.format("[HOP] No high-pop servers. Joining server with %d/%d players...", 
-                    pick.playing, pick.maxPlayers))
-                TeleportService:TeleportToPlaceInstance(placeId, pick.id, player)
-            end
+            -- Pick ANY random server (no filters for maximum spread)
+            local pick = serverObjects[math.random(1, #serverObjects)]
+            print(string.format("[HOP] Joining random server with %d/%d players (from %d available)...", 
+                pick.playing, pick.maxPlayers, #serverObjects))
+            TeleportService:TeleportToPlaceInstance(placeId, pick.id, player)
         else
             -- Priority 3: Blind rejoin (last resort)
             warn("[HOP] Server list failed or empty, using simple rejoin...")
@@ -2305,21 +2284,25 @@ task.wait(0.1)
 startHopTimer()
 print("[HOP] ✅ Started: 1-minute hop interval")
 
--- DON'T hop on startup if bots detected - let them coexist
--- Only hop if a NEW bot joins while we're already in the server
-print("[HOP] ℹ️ Startup: Allowing bots to coexist in same server")
+-- Check for bots on startup - NEW bot hops away immediately
+print("[HOP] ℹ️ Startup: Checking for other bots...")
 if checkForBots() then
-    print("[HOP] ℹ️ Other bots detected on startup, but staying to scan")
+    print("[HOP] 🤖 Other bots detected on startup - hopping to different server!")
+    -- Send any pending webhooks/Firebase before hopping
+    if #globalFound > 0 then
+        print("[HOP] Sending pending webhooks before startup hop...")
+        safeCall("sendWebhookGrouped", sendWebhookGrouped, globalFound)
+        table.clear(globalFound)
+        table.clear(globalFoundKeys)
+        task.wait(0.5)
+    end
+    serverHop("Bot Detected on Startup")
+else
+    print("[HOP] ✅ No other bots detected, staying in server")
 end
 
--- Monitor for new players (bots) - hop if someone NEW joins
-Players.PlayerAdded:Connect(function(newPlayer)
-    task.wait(0.5)
-    if BOT_USERNAMES[newPlayer.Name] then
-        print(string.format("[HOP] 🤖 Bot joined AFTER startup: %s - Hopping!", newPlayer.Name))
-        serverHop("Bot Joined")
-    end
-end)
+-- NO runtime bot detection - let bots coexist peacefully once established
+-- They'll hop naturally after 1 minute or when finding high value
 
 --// SCANNING
 function scanPlot(plot)
